@@ -1,0 +1,303 @@
+{
+  "common": {
+    "unknown": "Inconnu",
+    "error": "Erreur",
+    "success": "Succès",
+    "loading": "Chargement...",
+    "cancel": "Annuler",
+    "yes": "Oui",
+    "no": "Non",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "close": "Fermer",
+    "logout": "Déconnexion",
+    "logout_confirm_title": "Déconnexion",
+    "logout_confirm_message": "Voulez-vous vraiment vous déconnecter ?",
+    "press_again_to_exit": "Appuyez à nouveau pour quitter",
+    "confirm": "Confirmer",
+    "accept": "Accepter",
+    "reject": "Refuser",
+    "refresh": "Actualiser",
+    "empty": "Rien ici",
+    "roles": {
+      "ADMIN": "Administrateur",
+      "MEMBER": "Membre"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "{{appName}}",
+      "subtitle": "Connectez-vous pour gérer vos builds.",
+      "email_label": "Email",
+      "password_label": "Mot de passe",
+      "submit": "Se connecter",
+      "register_link": "Pas de compte ? S'inscrire",
+      "forgot_password_link": "Mot de passe oublié ?",
+      "resend_verification": "Renvoyer le code de vérification",
+      "not_verified_title": "Email non vérifié",
+      "not_verified_message": "Vous devez vérifier votre adresse email avant de vous connecter. Nous allons vous envoyer un code de vérification.",
+      "not_verified_send": "Envoyer le code",
+      "not_verified_cancel": "Annuler"
+    },
+    "register": {
+      "title": "Inscription",
+      "subtitle": "Rejoignez {{appName}} dès aujourd'hui.",
+      "first_name_label": "Prénom",
+      "last_name_label": "Nom",
+      "email_label": "Email",
+      "password_label": "Mot de passe",
+      "submit": "S'inscrire",
+      "login_link": "Déjà un compte ? Se connecter",
+      "otp_sent": "Un code de vérification a été envoyé à votre adresse email."
+    },
+    "verify_otp": {
+      "title": "Vérification",
+      "subtitle": "Entrez le code à 6 chiffres envoyé à votre adresse email.",
+      "code_label": "Code de vérification",
+      "submit": "Vérifier",
+      "resend": "Renvoyer le code",
+      "resend_countdown": "Renvoyer le code ({{seconds}}s)",
+      "back_to_login": "Retour à la connexion",
+      "invalid_code": "Le code doit faire 6 chiffres"
+    },
+    "forgot_password": {
+      "title": "Mot de passe oublié",
+      "subtitle": "Entrez votre adresse email pour recevoir un code de réinitialisation.",
+      "email_label": "Adresse email",
+      "submit": "Envoyer le code",
+      "back_to_login": "Retour à la connexion"
+    },
+    "reset_password": {
+      "title": "Réinitialiser le mot de passe",
+      "subtitle": "Entrez le code envoyé à {{email}} et choisissez un nouveau mot de passe.",
+      "password_label": "Nouveau mot de passe",
+      "submit": "Réinitialiser le mot de passe",
+      "resend": "Renvoyer le code",
+      "resend_countdown": "Renvoyer le code ({{seconds}}s)",
+      "invalid_code": "Le code doit faire 6 chiffres",
+      "not_your_email": "Ce n'est pas votre email ?",
+      "expired": "Cette session a expiré. Veuillez demander un nouveau code.",
+      "request_new_code": "Demander un nouveau code",
+      "success": "Mot de passe mis à jour avec succès",
+      "back_to_login": "Retour à la connexion"
+    },
+    "change_password": {
+      "title": "Changer le mot de passe",
+      "current_password_label": "Mot de passe actuel",
+      "new_password_label": "Nouveau mot de passe",
+      "submit": "Modifier le mot de passe"
+    },
+    "change_email": {
+      "title": "Changer l'email",
+      "new_email_label": "Nouvelle adresse email",
+      "password_label": "Mot de passe actuel",
+      "submit": "Envoyer le code"
+    },
+    "change_email_verify": {
+      "title": "Vérifier le nouvel email",
+      "subtitle": "Entrez le code envoyé à {{email}}",
+      "code_label": "Code de vérification",
+      "submit": "Confirmer le changement",
+      "invalid_code": "Le code doit faire 6 chiffres"
+    },
+    "delete_account": {
+      "title": "Supprimer le compte",
+      "warning": "Cette action est irréversible. Toutes vos données seront supprimées définitivement.",
+      "password_label": "Votre mot de passe",
+      "submit": "Supprimer mon compte",
+      "confirm_title": "Confirmer la suppression",
+      "confirm_message": "Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.",
+      "confirm_button": "Supprimer"
+    }
+  },
+  "screens": {
+    "dashboard": {
+      "welcome": "Salut, {{name}} !",
+      "subtitle": "Voici vos projets actuels.",
+      "no_description": "Aucune description",
+      "empty_title": "Aucun projet trouvé.",
+      "empty_subtitle": "Créez votre premier projet pour commencer.",
+      "title": "Tableau de bord",
+      "fab_new_project": "Nouveau Projet"
+    },
+    "project_detail": {
+      "title": "Applications",
+      "empty_title": "Aucune application.",
+      "empty_subtitle": "Téléversez votre premier APK pour commencer.",
+      "fab_new_app": "Nouvelle Application",
+      "delete_confirm_title": "Supprimer le projet",
+      "delete_confirm_message": "Voulez-vous vraiment supprimer ce projet ? Cette action est irréversible.",
+      "delete_confirm_hint": "Tapez \"{{projectName}}\" pour confirmer la suppression :",
+      "delete_success": "Projet supprimé avec succès",
+      "delete_error": "Échec de la suppression du projet"
+    },
+    "release_list": {
+      "title": "Releases",
+      "empty_title": "Aucune release.",
+      "artifact_title": "Artéfacts Binaires",
+      "stable_chip": "Stable",
+      "build_info": "Build {{code}} • {{date}}",
+      "fab_new_release": "Nouvelle Release",
+      "delete_confirm_title": "Supprimer l'application",
+      "delete_confirm_message": "Voulez-vous vraiment supprimer cette application et toutes ses releases ? Cette action est irréversible.",
+      "delete_success": "Application supprimée avec succès",
+      "delete_error": "Échec de la suppression de l'application",
+      "bugs_button": "SIGNALER UN BUG",
+      "bugs_count": "{{count}} BUG ({{open}} OUVERT)",
+      "bugs_count_plural": "{{count}} BUGS ({{open}} OUVERTS)",
+      "manage_tags": "Gérer les tags",
+      "no_match_tag": "Aucune version ne correspond à ce tag"
+    },
+    "bugs": {
+      "title": "Bugs",
+      "empty": "Aucun bug rapporté pour cette release.",
+      "report_button": "Rapporter un Bug",
+      "creation_title": "Rapporter un Bug",
+      "creation_description_label": "Description",
+      "creation_description_placeholder": "Décrivez les étapes pour reproduire le bug...",
+      "submit_report": "Envoyer le rapport",
+      "success_report": "Bug rapporté !",
+      "detail_title": "Bug #{{id}}",
+      "discussion_title": "Discussion",
+      "publish_action": "Publier",
+      "resolve_action": "Marquer comme Résolu",
+      "reopen_action": "Réouvrir",
+      "comment_placeholder": "Ajouter un commentaire...",
+      "reported_at": "Rapporté le {{date}}",
+      "message_count": "{{count}} message",
+      "message_count_plural": "{{count}} messages",
+      "error_load": "Impossible de charger les bugs.",
+      "error_send": "Échec de l'envoi."
+    },
+    "upload": {
+      "title_new_release": "Nouvelle Release",
+      "title_new_app": "Nouvelle Application",
+      "file_missing": "Fichier manquant",
+      "file_missing_desc": "Veuillez sélectionner un fichier APK.",
+      "upload_error": "Erreur de téléversement",
+      "upload_success": "Upload réussi !",
+      "upload_success_desc": "L'APK est en cours de traitement par le serveur.",
+      "add_details": "Ajouter des détails (nom, description)",
+      "app_details_title": "Détails de l'Application",
+      "app_name_label": "Nom de l'application (optionnel)",
+      "app_name_placeholder": "ex: Mon Super Projet",
+      "description_label": "Description",
+      "description_placeholder": "Brève description du projet",
+      "submit_release": "Lancer la mise à jour",
+      "submit_app": "Lancer le déploiement",
+      "info_header": "Information",
+      "async_info_title": "Traitement asynchrone",
+      "async_info_desc": "Le serveur extraira automatiquement les métadonnées de l'APK (ID, Version).",
+      "analysis": {
+        "title": "Analyse APK",
+        "metadata_label": "MÉTA-DONNÉES",
+        "metadata_architecture": "Architecture",
+        "metadata_hash": "Hash",
+        "metadata_debuggable": "Débogable",
+        "metadata_size": "Taille",
+        "conflict_signature_title": "Conflit de signature",
+        "conflict_signature_desc": "Cette signature APK ne correspond pas à l'application existante.",
+        "action_create_sibling_label": "Créer une application sœur",
+        "action_create_sibling_desc": "Conserver les deux signatures comme variantes distinctes",
+        "tag_input_label": "Tag (ex: debug, staging, release)",
+        "action_override_label": "Remplacer la signature",
+        "action_override_desc": "Mettre à jour la signature de l'application existante",
+        "conflict_duplicate_title": "Artefact en double",
+        "conflict_duplicate_desc": "Un artefact identique existe déjà pour cette version.",
+        "no_conflict_title": "Aucun conflit détecté",
+        "no_conflict_desc": "L'APK peut être traité directement.",
+        "confirm_with_conflicts": "Confirmer et traiter",
+        "confirm_clean": "Lancer le traitement"
+      }
+    },
+    "activity": {
+      "title": "Activité Récente",
+      "empty": "Aucune activité.",
+      "filter": {
+        "all": "Tout",
+        "active": "En cours",
+        "success": "Succès",
+        "failure": "Échecs"
+      }
+    },
+    "create_project": {
+      "title": "Nouveau Projet",
+      "subtitle": "Organisez vos applications dans un espace dédié.",
+      "name_label": "Nom du projet",
+      "description_label": "Description (optionnelle)",
+      "submit": "Créer le projet",
+      "success": "Projet créé !",
+      "error": "Impossible de créer le projet."
+    },
+    "edit_project": {
+      "title": "Modifier le projet",
+      "subtitle": "Mettez à jour les informations de votre projet.",
+      "submit": "Enregistrer les modifications",
+      "success": "Projet mis à jour !",
+      "error": "Échec de la mise à jour du projet."
+    },
+    "edit_application": {
+      "title": "Modifier l'application",
+      "subtitle": "Mettez à jour les informations de votre application.",
+      "submit": "Enregistrer les modifications",
+      "success": "Application mise à jour !",
+      "error": "Échec de la mise à jour de l'application."
+    },
+    "invitations": {
+      "title": "Invitations",
+      "empty": "Aucune invitation en attente",
+      "accept_success": "Invitation acceptée",
+      "accept_success_desc": "Vous avez rejoint le projet avec succès.",
+      "reject_success": "Invitation refusée",
+      "role_proposed": "Rôle proposé : {{role}}"
+    },
+    "notifications": {
+      "title": "Notifications"
+    },
+    "settings": {
+      "title": "Paramètres",
+      "account_section": "Compte",
+      "change_password": "Changer le mot de passe",
+      "change_password_description": "Modifiez votre mot de passe",
+      "change_email": "Changer l'email",
+      "change_email_description": "Modifiez votre adresse email",
+      "delete_account": "Supprimer le compte",
+      "delete_account_description": "Supprimez définitivement votre compte"
+    },
+    "downloads": {
+      "title": "Téléchargements",
+      "clear": "Effacer",
+      "empty": "Aucun téléchargement"
+    }
+  },
+  "components": {
+    "apk_input": {
+      "drop_zone_empty": "Sélectionner un binaire APK",
+      "browse": "Parcourir",
+      "change_file": "Changer de fichier",
+      "uploading": "Envoi...",
+      "processing": "Traitement...",
+      "selection_failed": "Échec de la sélection",
+      "meta_info": "{{size}} MO • ANDROID"
+    }
+  },
+  "jobs": {
+    "labels": {
+      "job_id": "ID du Job",
+      "type": "Type",
+      "created_at": "Créé le",
+      "application": "Application",
+      "error": "Erreur"
+    },
+    "types": {
+      "BINARY_PROCESSING": "Traitement de binaire"
+    },
+    "status": {
+      "PENDING": "En attente",
+      "STARTED": "En cours",
+      "SUCCESS": "Réussite",
+      "FAILURE": "Échec",
+      "CANCELLED": "Annulé"
+    }
+  }
+}

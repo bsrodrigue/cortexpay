@@ -1,0 +1,303 @@
+{
+  "common": {
+    "unknown": "Unknown",
+    "error": "Error",
+    "success": "Success",
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "yes": "Yes",
+    "no": "No",
+    "save": "Save",
+    "delete": "Delete",
+    "close": "Close",
+    "logout": "Logout",
+    "logout_confirm_title": "Logout",
+    "logout_confirm_message": "Are you sure you want to sign out?",
+    "press_again_to_exit": "Press again to exit",
+    "confirm": "Confirm",
+    "accept": "Accept",
+    "reject": "Reject",
+    "refresh": "Refresh",
+    "empty": "Nothing here",
+    "roles": {
+      "ADMIN": "Administrator",
+      "MEMBER": "Member"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "{{appName}}",
+      "subtitle": "Sign in to manage your builds.",
+      "email_label": "Email",
+      "password_label": "Password",
+      "submit": "Sign In",
+      "register_link": "Don't have an account? Sign Up",
+      "forgot_password_link": "Forgot password?",
+      "resend_verification": "Resend verification code",
+      "not_verified_title": "Email not verified",
+      "not_verified_message": "You need to verify your email address before signing in. We'll send a verification code to your inbox.",
+      "not_verified_send": "Send code",
+      "not_verified_cancel": "Cancel"
+    },
+    "register": {
+      "title": "Sign Up",
+      "subtitle": "Join {{appName}} today.",
+      "first_name_label": "First Name",
+      "last_name_label": "Last Name",
+      "email_label": "Email",
+      "password_label": "Password",
+      "submit": "Register",
+      "login_link": "Already have an account? Sign In",
+      "otp_sent": "A verification code has been sent to your email."
+    },
+    "verify_otp": {
+      "title": "Verification",
+      "subtitle": "Enter the 6-digit code sent to your email.",
+      "code_label": "Verification code",
+      "submit": "Verify",
+      "resend": "Resend code",
+      "resend_countdown": "Resend code ({{seconds}}s)",
+      "back_to_login": "Back to login",
+      "invalid_code": "Code must be 6 digits"
+    },
+    "forgot_password": {
+      "title": "Forgot Password",
+      "subtitle": "Enter your email to receive a reset code.",
+      "email_label": "Email address",
+      "submit": "Send Code",
+      "back_to_login": "Back to login"
+    },
+    "reset_password": {
+      "title": "Reset Password",
+      "subtitle": "Enter the code sent to {{email}} and choose a new password.",
+      "password_label": "New password",
+      "submit": "Reset Password",
+      "resend": "Resend code",
+      "resend_countdown": "Resend code ({{seconds}}s)",
+      "invalid_code": "Code must be 6 digits",
+      "not_your_email": "Not your email?",
+      "expired": "This session has expired. Please request a new code.",
+      "request_new_code": "Request a new code",
+      "success": "Password updated successfully",
+      "back_to_login": "Back to login"
+    },
+    "change_password": {
+      "title": "Change Password",
+      "current_password_label": "Current password",
+      "new_password_label": "New password",
+      "submit": "Update Password"
+    },
+    "change_email": {
+      "title": "Change Email",
+      "new_email_label": "New email address",
+      "password_label": "Current password",
+      "submit": "Send Code"
+    },
+    "change_email_verify": {
+      "title": "Verify New Email",
+      "subtitle": "Enter the code sent to {{email}}",
+      "code_label": "Verification code",
+      "submit": "Confirm Change",
+      "invalid_code": "Code must be 6 digits"
+    },
+    "delete_account": {
+      "title": "Delete Account",
+      "warning": "This action is irreversible. All your data will be permanently deleted.",
+      "password_label": "Your password",
+      "submit": "Delete My Account",
+      "confirm_title": "Confirm Deletion",
+      "confirm_message": "Are you sure you want to delete your account? This action is irreversible.",
+      "confirm_button": "Delete"
+    }
+  },
+  "screens": {
+    "dashboard": {
+      "welcome": "Hi, {{name}}!",
+      "subtitle": "Here are your current projects.",
+      "no_description": "No description",
+      "empty_title": "No projects found.",
+      "empty_subtitle": "Create your first project to get started.",
+      "title": "Dashboard",
+      "fab_new_project": "New Project"
+    },
+    "project_detail": {
+      "title": "Applications",
+      "empty_title": "No applications.",
+      "empty_subtitle": "Upload your first APK to get started.",
+      "fab_new_app": "New Application",
+      "delete_confirm_title": "Delete Project",
+      "delete_confirm_message": "Are you sure you want to delete this project? This action is irreversible.",
+      "delete_confirm_hint": "Type \"{{projectName}}\" to confirm deletion:",
+      "delete_success": "Project deleted successfully",
+      "delete_error": "Failed to delete project"
+    },
+    "release_list": {
+      "title": "Releases",
+      "empty_title": "No releases.",
+      "artifact_title": "Binary Artifacts",
+      "stable_chip": "Stable",
+      "build_info": "Build {{code}} • {{date}}",
+      "fab_new_release": "New Release",
+      "delete_confirm_title": "Delete Application",
+      "delete_confirm_message": "Are you sure you want to delete this application and all its releases? This action is irreversible.",
+      "delete_success": "Application deleted successfully",
+      "delete_error": "Failed to delete application",
+      "bugs_button": "REPORT A BUG",
+      "bugs_count": "{{count}} BUG ({{open}} OPEN)",
+      "bugs_count_plural": "{{count}} BUGS ({{open}} OPEN)",
+      "manage_tags": "Manage tags",
+      "no_match_tag": "No release matches this tag"
+    },
+    "bugs": {
+      "title": "Bugs",
+      "empty": "No bugs reported for this release.",
+      "report_button": "Report a Bug",
+      "creation_title": "Report a Bug",
+      "creation_description_label": "Description",
+      "creation_description_placeholder": "Describe the steps to reproduce the bug...",
+      "submit_report": "Submit Report",
+      "success_report": "Bug reported!",
+      "detail_title": "Bug #{{id}}",
+      "discussion_title": "Discussion",
+      "publish_action": "Publish",
+      "resolve_action": "Mark as Resolved",
+      "reopen_action": "Reopen",
+      "comment_placeholder": "Add a comment...",
+      "reported_at": "Reported on {{date}}",
+      "message_count": "{{count}} message",
+      "message_count_plural": "{{count}} messages",
+      "error_load": "Failed to load bugs.",
+      "error_send": "Failed to send."
+    },
+    "upload": {
+      "title_new_release": "New Release",
+      "title_new_app": "New Application",
+      "file_missing": "Missing File",
+      "file_missing_desc": "Please select an APK file.",
+      "upload_error": "Upload Error",
+      "upload_success": "Upload Successful!",
+      "upload_success_desc": "The APK is being processed by the server.",
+      "add_details": "Add details (name, description)",
+      "app_details_title": "Application Details",
+      "app_name_label": "Application Name (optional)",
+      "app_name_placeholder": "e.g. My Super Project",
+      "description_label": "Description",
+      "description_placeholder": "Brief description of the project",
+      "submit_release": "Launch Update",
+      "submit_app": "Launch Deployment",
+      "info_header": "Information",
+      "async_info_title": "Asynchronous Processing",
+      "async_info_desc": "The server will automatically extract APK metadata (ID, Version).",
+      "analysis": {
+        "title": "APK Analysis",
+        "metadata_label": "METADATA",
+        "metadata_architecture": "Architecture",
+        "metadata_hash": "Hash",
+        "metadata_debuggable": "Debuggable",
+        "metadata_size": "Size",
+        "conflict_signature_title": "Signature Conflict",
+        "conflict_signature_desc": "This APK signature does not match the existing application.",
+        "action_create_sibling_label": "Create sibling application",
+        "action_create_sibling_desc": "Keep both signatures as distinct variants",
+        "tag_input_label": "Tag (e.g. debug, staging, release)",
+        "action_override_label": "Override signature",
+        "action_override_desc": "Update the existing application's signature",
+        "conflict_duplicate_title": "Duplicate Artifact",
+        "conflict_duplicate_desc": "An identical artifact already exists for this version.",
+        "no_conflict_title": "No Conflict Detected",
+        "no_conflict_desc": "The APK can be processed directly.",
+        "confirm_with_conflicts": "Confirm and process",
+        "confirm_clean": "Start processing"
+      }
+    },
+    "activity": {
+      "title": "Recent Activity",
+      "empty": "No activity.",
+      "filter": {
+        "all": "All",
+        "active": "In Progress",
+        "success": "Success",
+        "failure": "Failures"
+      }
+    },
+    "create_project": {
+      "title": "New Project",
+      "subtitle": "Organize your applications in a dedicated space.",
+      "name_label": "Project Name",
+      "description_label": "Description (optional)",
+      "submit": "Create Project",
+      "success": "Project created!",
+      "error": "Failed to create project."
+    },
+    "edit_project": {
+      "title": "Edit Project",
+      "subtitle": "Update your project information.",
+      "submit": "Save Changes",
+      "success": "Project updated!",
+      "error": "Failed to update project."
+    },
+    "edit_application": {
+      "title": "Edit Application",
+      "subtitle": "Update your application information.",
+      "submit": "Save Changes",
+      "success": "Application updated!",
+      "error": "Failed to update application."
+    },
+    "invitations": {
+      "title": "Invitations",
+      "empty": "No pending invitations",
+      "accept_success": "Invitation accepted",
+      "accept_success_desc": "You have joined the project successfully.",
+      "reject_success": "Invitation rejected",
+      "role_proposed": "Proposed role: {{role}}"
+    },
+    "notifications": {
+      "title": "Notifications"
+    },
+    "settings": {
+      "title": "Settings",
+      "account_section": "Account",
+      "change_password": "Change Password",
+      "change_password_description": "Update your password",
+      "change_email": "Change Email",
+      "change_email_description": "Update your email address",
+      "delete_account": "Delete Account",
+      "delete_account_description": "Permanently delete your account"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "clear": "Clear",
+      "empty": "No downloads"
+    }
+  },
+  "components": {
+    "apk_input": {
+      "drop_zone_empty": "Select an APK binary",
+      "browse": "Browse",
+      "change_file": "Change file",
+      "uploading": "Uploading...",
+      "processing": "Processing...",
+      "selection_failed": "Selection failed",
+      "meta_info": "{{size}} MB • ANDROID"
+    }
+  },
+  "jobs": {
+    "labels": {
+      "job_id": "Job ID",
+      "type": "Type",
+      "created_at": "Created",
+      "application": "Application",
+      "error": "Error"
+    },
+    "types": {
+      "BINARY_PROCESSING": "Binary Processing"
+    },
+    "status": {
+      "PENDING": "Pending",
+      "STARTED": "Started",
+      "SUCCESS": "Success",
+      "FAILURE": "Failure",
+      "CANCELLED": "Cancelled"
+    }
+  }
+}

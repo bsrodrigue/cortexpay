@@ -1,0 +1,77 @@
+import { useEffect, useRef } from 'react';
+
+import { APIService } from '@/libs/api/client';
+import { ErrorCode } from '@/libs/api/error-codes';
+import { TokenService } from '@/libs/api/token-service';
+import { BackendApiError } from '@/libs/api/types';
+import { AppConfig } from '@/libs/app-config';
+import { createLogger } from '@/libs/log';
+import { authService } from '@/modules/auth/api/services';
+import { useAuthStore } from '@/modules/auth/store';
+
+const logger = createLogger('ApplicationStartup');
+
+export default function useInitApp() {
+  const { isAuthenticated, setUser, logout, isVerifyingAuth, setIsVerifyingAuth } = useAuthStore();
+  const hasInitialized = useRef(false);
+
+  useEffect(() => {
+    if (!APIService.isReady()) {
+      hasInitialized.current = false;
+    }
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    async function initApplication() {
+      logger.debug('Initializing application');
+
+      const apiUrl = await AppConfig.getApiUrl();
+      APIService.initializeDefaultClient(apiUrl);
+
+      await TokenService.loadTokens();
+
+      if (!TokenService.hasToken()) {
+        logger.debug('No bearer token found, skipping authenticated bootstrap');
+        void logout();
+        setIsVerifyingAuth(false);
+        return;
+      }
+
+      try {
+        const user = await authService.me();
+        setUser(user);
+        logger.debug(`User authenticated: ${JSON.stringify(user)}`);
+      } catch (error: unknown) {
+        const isAuthError =
+          error instanceof BackendApiError &&
+          (error.code === ErrorCode.AUTH_TOKEN_INVALID ||
+            error.code === ErrorCode.AUTH_TOKEN_EXPIRED ||
+            error.code === ErrorCode.AUTH_SESSION_EXPIRED ||
+            error.code === ErrorCode.AUTH_NOT_AUTHENTICATED ||
+            error.code === ErrorCode.AUTH_AUTHENTICATION_FAILED ||
+            error.code === ErrorCode.AUTH_USER_NOT_FOUND);
+
+        if (isAuthError) {
+          logger.debug('Stored token is invalid or expired, wiping session');
+          await TokenService.clearTokens();
+          void logout();
+        } else {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          logger.warn(`Failed to fetch profile: ${message}. Keeping token for retry.`);
+        }
+      } finally {
+        setIsVerifyingAuth(false);
+      }
+    }
+
+    void initApplication();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isLoading = isVerifyingAuth;
+
+  return {
+    isLoading,
+    isAuthenticated,
+  };
+}

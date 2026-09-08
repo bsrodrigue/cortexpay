@@ -1,0 +1,13 @@
+from pydantic_settings import BaseSettings
+import os
+
+class Settings(BaseSettings):
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://cortex:cortex_secret_password@localhost:5432/cortex_pay")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    FX_QUOTE_TTL_SECONDS: int = 90
+    DEFAULT_FX_RATE_USD_XOF: float = 610.00  # 1 USD = 610 XOF
+    MIN_SPREAD_PCT: float = 0.035  # 3.5%
+    MAX_SPREAD_PCT: float = 0.045  # 4.5%
+    OTP_MOCK_CODE: str = "123456"
+
+settings = Settings()
