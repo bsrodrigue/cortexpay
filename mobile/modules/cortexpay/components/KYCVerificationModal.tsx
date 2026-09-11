@@ -1,9 +1,11 @@
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, HelperText, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, HelperText, IconButton, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
 
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
+import { cortexPayApi } from '../api';
 import { KYCStatusResponse } from '../types';
 
 interface KYCVerificationModalProps {
@@ -34,24 +36,147 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
   const [docNumber, setDocNumber] = useState('1002200192931');
   const [error, setError] = useState<string | null>(null);
 
+  // Photo captures state
+  const [frontUri, setFrontUri] = useState<string | null>(null);
+  const [frontBase64, setFrontBase64] = useState<string | null>(null);
+  const [backUri, setBackUri] = useState<string | null>(null);
+  const [backBase64, setBackBase64] = useState<string | null>(null);
+  const [selfieUri, setSelfieUri] = useState<string | null>(null);
+  const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const status = kycData?.kyc_status || 'NOT_STARTED';
+
+  const pickImage = async (field: 'front' | 'back' | 'selfie', useCamera: boolean) => {
+    try {
+      let result: ImagePicker.ImagePickerResult;
+
+      if (useCamera) {
+        const { status: permStatus } = await ImagePicker.requestCameraPermissionsAsync();
+        if (permStatus !== 'granted') {
+          Alert.alert('Permission requise', 'Veuillez autoriser l\'accès à l\'appareil photo pour photographier vos documents.');
+          return;
+        }
+
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: field === 'selfie' ? [1, 1] : [4, 3],
+          quality: 0.8,
+          base64: true,
+          cameraType: field === 'selfie' ? ImagePicker.CameraType.front : ImagePicker.CameraType.back,
+        });
+      } else {
+        const { status: permStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (permStatus !== 'granted') {
+          Alert.alert('Permission requise', 'Veuillez autoriser l\'accès à votre galerie photo.');
+          return;
+        }
+
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: field === 'selfie' ? [1, 1] : [4, 3],
+          quality: 0.8,
+          base64: true,
+        });
+      }
+
+      if (!result.canceled && result.assets.length > 0) {
+        const selectedAsset = result.assets[0];
+        if (field === 'front') {
+          setFrontUri(selectedAsset.uri);
+          setFrontBase64(selectedAsset.base64 || null);
+        }
+        if (field === 'back') {
+          setBackUri(selectedAsset.uri);
+          setBackBase64(selectedAsset.base64 || null);
+        }
+        if (field === 'selfie') {
+          setSelfieUri(selectedAsset.uri);
+          setSelfieBase64(selectedAsset.base64 || null);
+        }
+      }
+    } catch (e: unknown) {
+      const err = e as Error;
+      Alert.alert('Erreur capture', err.message || 'Impossible de capturer la photo.');
+    }
+  };
+
+  const handleChooseSource = (field: 'front' | 'back' | 'selfie') => {
+    Alert.alert(
+      'Document d\'identité',
+      'Choisissez la source pour la photo',
+      [
+        {
+          text: 'Prendre une photo (Appareil photo)',
+          onPress: () => {
+            void pickImage(field, true);
+          },
+        },
+        {
+          text: 'Choisir depuis la Galerie',
+          onPress: () => {
+            void pickImage(field, false);
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
+  };
 
   const handleSubmit = () => {
     if (!docNumber || docNumber.trim().length < 5) {
-      setError('Veuillez renseigner un numéro de pièce valide.');
+      setError('Veuillez renseigner un numéro de pièce officiel valide.');
       return;
     }
+    if (!frontBase64) {
+      setError('Veuillez photographier le recto de votre pièce d\'identité.');
+      return;
+    }
+    if (docType === 'NATIONAL_ID' && !backBase64) {
+      setError('Veuillez photographier le verso de votre CNI.');
+      return;
+    }
+    if (!selfieBase64) {
+      setError('Veuillez prendre un selfie pour vérification biométrique.');
+      return;
+    }
+
     setError(null);
-    void onSubmitKYC({
-      documentType: docType,
-      documentNumber: docNumber.trim(),
-      frontImageUrl: 'https://mock.storage.cortexcard.sn/kyc/cni_front.jpg',
-      backImageUrl: 'https://mock.storage.cortexcard.sn/kyc/cni_back.jpg',
-      selfieUrl: 'https://mock.storage.cortexcard.sn/kyc/selfie.jpg',
-    }).catch((e: unknown) => {
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      setError(err.response?.data?.detail || err.message || 'Erreur soumission');
-    });
+    setIsUploading(true);
+
+    void (async () => {
+      try {
+        // Upload front
+        const frontRes = await cortexPayApi.uploadKYCImage(frontBase64, 'front');
+
+        // Upload back if provided
+        let backUrl: string | undefined;
+        if (backBase64) {
+          const backRes = await cortexPayApi.uploadKYCImage(backBase64, 'back');
+          backUrl = backRes.image_url;
+        }
+
+        // Upload selfie
+        const selfieRes = await cortexPayApi.uploadKYCImage(selfieBase64, 'selfie');
+
+        // Submit form data with uploaded URLs
+        await onSubmitKYC({
+          documentType: docType,
+          documentNumber: docNumber.trim(),
+          frontImageUrl: frontRes.image_url,
+          backImageUrl: backUrl,
+          selfieUrl: selfieRes.image_url,
+        });
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { detail?: string } }; message?: string };
+        setError(err.response?.data?.detail || err.message || 'Erreur lors du téléchargement des photos');
+      } finally {
+        setIsUploading(false);
+      }
+    })();
   };
 
   const handleSimulate = (decision: 'APPROVED' | 'REJECTED', tier?: number, reason?: string) => {
@@ -165,26 +290,80 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
                 style={styles.input}
               />
 
+              <Text variant="labelMedium" style={styles.sectionDocTitle}>
+                Photos de la pièce &amp; Selfie biométrique
+              </Text>
+
+              {/* Document Photo Pickers */}
+              <View style={styles.photosGrid}>
+                {/* Recto */}
+                <TouchableOpacity
+                  style={[styles.photoCard, frontUri ? styles.photoCardFilled : null]}
+                  onPress={() => handleChooseSource('front')}
+                >
+                  {frontUri ? (
+                    <Image source={{ uri: frontUri }} style={styles.previewImage} />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <IconButton icon="camera" size={26} iconColor="#2563EB" />
+                      <Text variant="labelSmall" style={styles.placeholderLabel}>
+                        Photo Recto *
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Verso (only for CNI or Driving License) */}
+                {docType !== 'PASSPORT' && (
+                  <TouchableOpacity
+                    style={[styles.photoCard, backUri ? styles.photoCardFilled : null]}
+                    onPress={() => handleChooseSource('back')}
+                  >
+                    {backUri ? (
+                      <Image source={{ uri: backUri }} style={styles.previewImage} />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <IconButton icon="camera" size={26} iconColor="#2563EB" />
+                        <Text variant="labelSmall" style={styles.placeholderLabel}>
+                          Photo Verso *
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Selfie */}
+                <TouchableOpacity
+                  style={[styles.photoCard, selfieUri ? styles.photoCardFilled : null]}
+                  onPress={() => handleChooseSource('selfie')}
+                >
+                  {selfieUri ? (
+                    <Image source={{ uri: selfieUri }} style={styles.previewImage} />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <IconButton icon="face-recognition" size={26} iconColor="#16A34A" />
+                      <Text variant="labelSmall" style={styles.placeholderLabel}>
+                        Selfie Portrait *
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
               {error && <HelperText type="error" visible>{error}</HelperText>}
 
-              <Surface style={styles.uploadPreview} elevation={1}>
-                <Text variant="bodySmall" style={styles.uploadText}>
-                  📷 Photos simulées (Recto CNI + Selfie biométrique prêt)
-                </Text>
-              </Surface>
-
               <View style={styles.actionButtons}>
-                <Button mode="text" onPress={onDismiss}>
+                <Button mode="text" onPress={onDismiss} disabled={isSubmitting || isUploading}>
                   Plus tard
                 </Button>
                 <Button
                   mode="contained"
                   onPress={handleSubmit}
-                  loading={isSubmitting}
-                  disabled={isSubmitting}
+                  loading={isSubmitting || isUploading}
+                  disabled={isSubmitting || isUploading}
                   style={styles.submitBtn}
                 >
-                  Transmettre mes pièces
+                  {isUploading ? 'Téléchargement...' : 'Transmettre mes pièces'}
                 </Button>
               </View>
             </View>
@@ -199,12 +378,12 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
     modal: {
       backgroundColor: theme.colors.surface,
-      margin: 20,
+      margin: 16,
       borderRadius: 20,
-      maxHeight: '90%',
+      maxHeight: '92%',
     },
     scrollContent: {
-      padding: 24,
+      padding: 20,
     },
     title: {
       fontWeight: 'bold',
@@ -248,28 +427,62 @@ const createStyles = (theme: Theme) =>
       marginBottom: 8,
       fontWeight: '600',
     },
+    sectionDocTitle: {
+      fontWeight: '600',
+      marginTop: 12,
+      marginBottom: 8,
+      color: theme.colors.onSurface,
+    },
+    photosGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 10,
+    },
+    photoCard: {
+      flex: 1,
+      minWidth: 90,
+      height: 105,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: '#D1D5DB',
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#F9FAFB',
+      overflow: 'hidden',
+    },
+    photoCardFilled: {
+      borderStyle: 'solid',
+      borderColor: '#10B981',
+    },
+    photoPlaceholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    placeholderLabel: {
+      fontSize: 10,
+      fontWeight: 'bold',
+      color: theme.colors.onSurfaceVariant,
+      marginTop: -4,
+    },
+    previewImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
     segmented: {
       marginBottom: 16,
     },
     input: {
-      marginBottom: 12,
-    },
-    uploadPreview: {
-      padding: 14,
-      borderRadius: 10,
-      backgroundColor: theme.colors.surfaceVariant,
-      marginVertical: 12,
-      alignItems: 'center',
-    },
-    uploadText: {
-      color: theme.colors.onSurfaceVariant,
+      marginBottom: 6,
     },
     actionButtons: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
       alignItems: 'center',
       gap: 12,
-      marginTop: 12,
+      marginTop: 16,
     },
     submitBtn: {
       minWidth: 180,

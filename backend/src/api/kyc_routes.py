@@ -1,13 +1,58 @@
 import uuid
+import os
+import base64
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel
 import asyncpg
 
 from backend.src.core.database import get_db_connection
 
 kyc_router = APIRouter(prefix="/kyc", tags=["KYC & Compliance"])
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads", "kyc")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+class ImageUploadPayload(BaseModel):
+    image_base64: str
+    field_name: Optional[str] = "doc"
+
+@kyc_router.post("/upload-image")
+async def upload_kyc_image(payload: ImageUploadPayload):
+    """
+    Accepts real captured pictures (Recto, Verso, Selfie) encoded in base64.
+    This works reliably across all mobile environments without requiring python-multipart.
+    Returns the public/accessible relative URL.
+    """
+    raw_data = payload.image_base64
+    if "," in raw_data:
+        raw_data = raw_data.split(",", 1)[1]
+
+    try:
+        image_bytes = base64.b64decode(raw_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Encodage base64 invalide: {str(e)}"
+        )
+
+    unique_filename = f"kyc_{payload.field_name}_{uuid.uuid4().hex[:12]}.jpg"
+    destination_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+    try:
+        with open(destination_path, "wb") as f:
+            f.write(image_bytes)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Échec de l'enregistrement de l'image: {str(e)}"
+        )
+
+    return {
+        "filename": unique_filename,
+        "image_url": f"/uploads/kyc/{unique_filename}"
+    }
 
 class KYCSubmitRequestDTO(BaseModel):
     user_id: str
@@ -34,7 +79,6 @@ async def get_kyc_status(user_id: str, conn: asyncpg.Connection = Depends(get_db
         user_id
     )
     if not user:
-        # Fallback for demo if user not in users table yet
         return {
             "user_id": user_id,
             "kyc_status": "NOT_STARTED",

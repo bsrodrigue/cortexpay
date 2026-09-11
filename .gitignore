@@ -29,6 +29,13 @@ web-build/
 .env.test.local
 .env.production.local
 
+# Uploads & temporary media
+backend/uploads/
+uploads/
+*.jpg
+*.jpeg
+*.png
+
 # OS
 .DS_Store
 Thumbs.db

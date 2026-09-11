@@ -210,13 +210,24 @@ async def test_kyc_verification_and_card_blocking(client):
     assert blocked_res.status_code == 403
     assert "kyc" in blocked_res.json()["detail"].lower()
 
+    # 2.b Upload KYC Image via base64
+    fake_png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    upload_res = await client.post("/api/kyc/upload-image", json={
+        "image_base64": fake_png_base64,
+        "field_name": "front"
+    })
+    assert upload_res.status_code == 200
+    upload_data = upload_res.json()
+    assert "filename" in upload_data
+    assert upload_data["image_url"].startswith("/uploads/kyc/")
+
     # 3. Submit KYC documents
     submit_res = await client.post("/api/kyc/submit", json={
         "user_id": user_id,
         "document_type": "NATIONAL_ID",
         "document_number": "1002200192931",
         "country_code": "SEN",
-        "front_image_url": "https://storage.cortexcard.test/kyc/front.jpg",
+        "front_image_url": upload_data["image_url"],
         "back_image_url": "https://storage.cortexcard.test/kyc/back.jpg",
         "selfie_url": "https://storage.cortexcard.test/kyc/selfie.jpg"
     })

@@ -127,6 +127,17 @@ export const cortexPayApi = {
   },
 
   /**
+   * Upload captured KYC document photo (Recto, Verso, Selfie)
+   */
+  async uploadKYCImage(imageBase64: string, fieldName: 'front' | 'back' | 'selfie'): Promise<{ filename: string; image_url: string }> {
+    const response = await http.post<{ filename: string; image_url: string }>('/kyc/upload-image', {
+      image_base64: imageBase64,
+      field_name: fieldName,
+    });
+    return response;
+  },
+
+  /**
    * Simulate KYC Approval / Rejection (Demo & MVP Test)
    */
   async simulateKYCDecision(params: { user_id: string; decision: 'APPROVED' | 'REJECTED'; tier?: number; rejection_reason?: string }) {
