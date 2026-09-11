@@ -33,7 +33,7 @@ export const CortexDashboardScreen: React.FC = () => {
   // Queries
   const { data: walletsData, isLoading: isLoadingWallets, refetch: refetchWallets } = useWallets();
   const { data: cards, isLoading: isLoadingCards, refetch: refetchCards } = useUserCards();
-  const { data: kycData, refetch: refetchKYC } = useKYCStatus();
+  const { kycData, isApproved: isKYCApproved, refetch: refetchKYC } = useKYCStatus();
 
   // Mutations
   const depositMutation = useDepositMobileMoney();
@@ -59,8 +59,6 @@ export const CortexDashboardScreen: React.FC = () => {
 
   const xofWallet = walletsData?.wallets?.XOF;
   const usdWallet = walletsData?.wallets?.USD;
-
-  const isKYCApproved = kycData?.kyc_status === 'APPROVED' || (kycData?.kyc_tier ?? 0) >= 1;
 
   const handleRefresh = () => {
     refetchWallets();

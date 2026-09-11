@@ -138,12 +138,28 @@ export const KYC_QUERY_KEYS = {
 
 export function useKYCStatus() {
   const userId = useEffectiveUserId();
-  return useQuery({
+  const query = useQuery({
     queryKey: KYC_QUERY_KEYS.status(userId),
     queryFn: () => cortexPayApi.getKYCStatus(userId),
     enabled: !!userId,
     refetchInterval: 5000,
   });
+
+  const kyc = query.data;
+  const status = kyc?.kyc_status || 'NOT_STARTED';
+  const tier = kyc?.kyc_tier ?? 0;
+
+  return {
+    ...query,
+    kycData: kyc,
+    status,
+    tier,
+    isApproved: status === 'APPROVED' || tier >= 1,
+    isPending: status === 'SUBMITTED' || status === 'UNDER_REVIEW',
+    isRejected: status === 'REJECTED',
+    isNotStarted: status === 'NOT_STARTED',
+    canIssueCard: status === 'APPROVED' && tier >= 1,
+  };
 }
 
 export function useSubmitKYC() {
