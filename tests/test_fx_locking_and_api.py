@@ -29,6 +29,56 @@ async def test_api_ping(client):
     assert data["service"] == "cortex-pay"
 
 @pytest.mark.asyncio(loop_scope="function")
+async def test_auth_flow(client):
+    """
+    Validation du parcours complet d'authentification mobile:
+    1. POST /api/auth/register/
+    2. POST /api/auth/login/
+    3. GET /api/auth/me/
+    4. POST /api/auth/verify-otp/
+    """
+    unique_email = f"user_{uuid.uuid4().hex[:8]}@cortexcard.test"
+    password = "SecurePassword123!"
+
+    # 1. Register
+    reg_res = await client.post("/api/auth/register/", json={
+        "email": unique_email,
+        "password": password,
+        "first_name": "Badini",
+        "last_name": "Rodrigue"
+    })
+    assert reg_res.status_code == 200
+    user = reg_res.json()
+    assert user["email"] == unique_email
+    assert user["first_name"] == "Badini"
+    assert "user_id" in user
+
+    # 2. Login
+    login_res = await client.post("/api/auth/login/", json={
+        "email": unique_email,
+        "password": password
+    })
+    assert login_res.status_code == 200
+    tokens = login_res.json()
+    assert "access" in tokens
+    assert "refresh" in tokens
+
+    # 3. Me
+    me_res = await client.get("/api/auth/me/", headers={
+        "Authorization": f"Bearer {tokens['access']}"
+    })
+    assert me_res.status_code == 200
+    me = me_res.json()
+    assert me["email"] == unique_email
+
+    # 4. Verify OTP
+    otp_res = await client.post("/api/auth/verify-otp/", json={
+        "email": unique_email,
+        "code": "123456"
+    })
+    assert otp_res.status_code == 200
+
+@pytest.mark.asyncio(loop_scope="function")
 async def test_fx_quote_locking_and_expiry(client):
     """
     S2 J6-J7: Rejet immédiat du devis de change après 90 secondes.
