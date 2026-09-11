@@ -20,8 +20,10 @@ export const CORTEX_QUERY_KEYS = {
 
 function useEffectiveUserId(): string {
   const authUser = useAuthStore((state) => state.user);
+  if (authUser?.user_id) return authUser.user_id;
+  if (authUser?.id) return `usr_${authUser.id}`;
   const currentUserId = useCortexPayStore((state) => state.currentUserId);
-  return authUser?.user_id || currentUserId || `usr_${authUser?.id || 'default'}`;
+  return currentUserId || 'usr_cortex_demo';
 }
 
 export function useWallets() {
@@ -119,12 +121,13 @@ export function useToggleFreezeCard() {
 
 export function useSimulateMerchantDebit() {
   const queryClient = useQueryClient();
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: (params: MerchantDebitRequest) => cortexPayApi.simulateMerchantDebit(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
     },
   });
 }
