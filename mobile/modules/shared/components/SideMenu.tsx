@@ -146,34 +146,9 @@ export const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose }) => {
 
           <Drawer.Section style={styles.section}>
             <Drawer.Item
-              label="CortexPay FinTech"
+              label="Portefeuille & Cartes"
               icon="credit-card-outline"
-              onPress={() => navigateTo('/(protected)/cortex')}
-            />
-            <Drawer.Item
-              label={t('screens.dashboard.title', 'Dashboard')}
-              icon="view-dashboard"
               onPress={() => navigateTo('/')}
-            />
-            <Drawer.Item
-              label={t('screens.invitations.title', 'Invitations')}
-              icon="email-outline"
-              onPress={() => navigateTo('/invitations')}
-            />
-            <Drawer.Item
-              label={t('screens.notifications.title', 'Notifications')}
-              icon="bell-outline"
-              onPress={() => navigateTo('/notifications')}
-            />
-            <Drawer.Item
-              label={t('screens.activity.title', 'Activité')}
-              icon="history"
-              onPress={() => navigateTo('/activity')}
-            />
-            <Drawer.Item
-              label={t('screens.downloads.title', 'Downloads')}
-              icon="download"
-              onPress={() => navigateTo('/(protected)/downloads')}
             />
           </Drawer.Section>
 

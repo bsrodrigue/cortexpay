@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ScrollView, View, StyleSheet, RefreshControl, Alert } from 'react-native';
-import { Text, Surface, Button, Portal, Modal, TextInput } from 'react-native-paper';
+import { Text, Surface, Button, Portal, Modal, TextInput, IconButton } from 'react-native-paper';
 import { useThemedStyles, Theme } from '@/modules/shared/theme';
+import { SideMenu } from '@/modules/shared/components/SideMenu';
+import { useAuthStore } from '@/modules/auth/store';
 import {
   useWallets,
   useUserCards,
@@ -18,6 +20,8 @@ import { SimulatorPanel } from '../components/SimulatorPanel';
 
 export const CortexDashboardScreen: React.FC = () => {
   const styles = useThemedStyles(createStyles);
+  const { user } = useAuthStore();
+  const [menuVisible, setMenuVisible] = useState(false);
 
   // Queries
   const { data: walletsData, isLoading: isLoadingWallets, refetch: refetchWallets } = useWallets();
@@ -106,20 +110,32 @@ export const CortexDashboardScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={isLoadingWallets || isLoadingCards} onRefresh={handleRefresh} />}
-    >
-      {/* Header & Wallets Overview */}
-      <View style={styles.header}>
-        <Text variant="headlineSmall" style={styles.appTitle}>
-          CortexPay
-        </Text>
-        <Text variant="bodyMedium" style={styles.appSubtitle}>
-          FinTech Ledger Multi-Devises & Cartes Virtuelles
-        </Text>
-      </View>
+    <View style={styles.rootWrapper}>
+      <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={<RefreshControl refreshing={isLoadingWallets || isLoadingCards} onRefresh={handleRefresh} />}
+      >
+        {/* Header & Wallets Overview */}
+        <View style={styles.header}>
+          <View style={styles.headerTopRow}>
+            <IconButton
+              icon="menu"
+              size={26}
+              onPress={() => setMenuVisible(true)}
+              style={styles.menuButton}
+            />
+            <View style={styles.headerTitles}>
+              <Text variant="headlineSmall" style={styles.appTitle}>
+                CortexPay
+              </Text>
+              <Text variant="bodySmall" style={styles.appSubtitle}>
+                {user ? `Bonjour, ${user.first_name}` : 'FinTech Ledger Multi-Devises'}
+              </Text>
+            </View>
+          </View>
+        </View>
 
       <View style={styles.walletsRow}>
         <Surface style={styles.walletCard} elevation={2}>
@@ -229,11 +245,16 @@ export const CortexDashboardScreen: React.FC = () => {
         </Modal>
       </Portal>
     </ScrollView>
+    </View>
   );
 };
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
+    rootWrapper: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
@@ -244,6 +265,17 @@ const createStyles = (theme: Theme) =>
     },
     header: {
       marginBottom: 16,
+    },
+    headerTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    menuButton: {
+      marginLeft: -8,
+      marginRight: 4,
+    },
+    headerTitles: {
+      flex: 1,
     },
     appTitle: {
       fontWeight: 'bold',

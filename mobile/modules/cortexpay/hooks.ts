@@ -8,6 +8,7 @@ import {
   QuoteRequest,
 } from './types';
 import { useCortexPayStore } from './store';
+import { useAuthStore } from '@/modules/auth/store';
 import { createLogger } from '@/libs/log';
 
 const logger = createLogger('CortexPayHooks');
@@ -17,8 +18,14 @@ export const CORTEX_QUERY_KEYS = {
   cards: (userId: string) => ['cortexpay', 'cards', userId] as const,
 };
 
+function useEffectiveUserId(): string {
+  const authUser = useAuthStore((state) => state.user);
+  const currentUserId = useCortexPayStore((state) => state.currentUserId);
+  return authUser?.user_id || currentUserId || `usr_${authUser?.id || 'default'}`;
+}
+
 export function useWallets() {
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
   return useQuery({
     queryKey: CORTEX_QUERY_KEYS.wallets(userId),
     queryFn: () => cortexPayApi.getWallets(userId),
@@ -28,7 +35,7 @@ export function useWallets() {
 }
 
 export function useUserCards() {
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
   return useQuery({
     queryKey: CORTEX_QUERY_KEYS.cards(userId),
     queryFn: () => cortexPayApi.getUserCards(userId),
@@ -38,7 +45,7 @@ export function useUserCards() {
 
 export function useDepositMobileMoney() {
   const queryClient = useQueryClient();
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: (params: Omit<DepositRequest, 'user_id'>) =>
@@ -54,7 +61,7 @@ export function useDepositMobileMoney() {
 }
 
 export function useFXQuote() {
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: (params: Omit<QuoteRequest, 'user_id'>) =>
@@ -64,7 +71,7 @@ export function useFXQuote() {
 
 export function useConvertCurrency() {
   const queryClient = useQueryClient();
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: (params: { quoteId: string }) =>
@@ -82,7 +89,7 @@ export function useConvertCurrency() {
 
 export function useIssueCard() {
   const queryClient = useQueryClient();
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: (params: { cardholderName: string; initialFundingUsd: string }) =>
@@ -100,7 +107,7 @@ export function useIssueCard() {
 
 export function useToggleFreezeCard() {
   const queryClient = useQueryClient();
-  const userId = useCortexPayStore((state) => state.currentUserId);
+  const userId = useEffectiveUserId();
 
   return useMutation({
     mutationFn: (cardId: string) => cortexPayApi.toggleFreezeCard(cardId),

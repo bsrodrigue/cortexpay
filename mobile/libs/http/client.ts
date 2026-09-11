@@ -32,10 +32,12 @@ export class HTTPClient {
   }
 
   constructor(baseURL: string, config?: AxiosRequestConfig) {
-    this.baseURL = baseURL;
+    // Ensure baseURL ends with a slash so relative endpoints like 'auth/login/' don't concatenate into 'apiprojects/'
+    const normalizedBaseUrl = baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
+    this.baseURL = normalizedBaseUrl;
 
     this.instance = create({
-      baseURL,
+      baseURL: normalizedBaseUrl,
       timeout: 15000,
       ...config,
     });
