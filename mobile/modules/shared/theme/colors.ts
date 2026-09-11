@@ -10,33 +10,35 @@ export const toAlpha = (color: string, alpha: number): string => {
 };
 
 export const palette = {
-  // Material 3 Seed / Baseline Colors
-  primary: '#6750A4',
-  primaryDark: '#D0BCFF',
-  secondary: '#625B71',
-  secondaryDark: '#CCC2DC',
-  tertiary: '#7D5260',
-  tertiaryDark: '#EFB8C8',
-  error: '#B3261E',
-  errorDark: '#F2B8B5',
-  neutral: '#939094',
-  neutralDark: '#939094',
+  // CortexPay FinTech Brand Colors (Deep Navy, Vibrant Cyan/Electric Blue, Emerald Green & Gold)
+  primary: '#0F172A',         // Deep Slate / Navy Blue
+  primaryDark: '#38BDF8',     // Vibrant Electric Sky Blue
+  secondary: '#2563EB',       // Trust Blue
+  secondaryDark: '#60A5FA',   // Soft Tech Blue
+  tertiary: '#10B981',        // Emerald Green (Success & Growth)
+  tertiaryDark: '#34D399',    // Mint / Neon Emerald
+  error: '#DC2626',
+  errorDark: '#F87171',
+  neutral: '#64748B',
+  neutralDark: '#94A3B8',
 
   // Surfaces & Backgrounds
-  lightBackground: '#FEF7FF',
-  lightSurface: '#F7F2FA',
-  lightSurfaceVariant: '#E7E0EC',
-  darkBackground: '#141218',
-  darkSurface: '#1D1B20',
-  darkSurfaceVariant: '#49454F',
+  lightBackground: '#F8FAFC',
+  lightSurface: '#FFFFFF',
+  lightSurfaceVariant: '#F1F5F9',
+  darkBackground: '#0B0F19',  // Deep Cyber Dark
+  darkSurface: '#111827',     // Dark Card Slate
+  darkSurfaceVariant: '#1F2937',
 
   // Text & Icons
   black: '#000000',
   white: '#FFFFFF',
-  gray500: '#79747E',
-  gray400: '#938F99',
+  gray500: '#64748B',
+  gray400: '#94A3B8',
 
-  // Others
+  // FinTech Highlights
+  gold: '#F59E0B',
+  cyan: '#06B6D4',
   transparent: 'transparent',
   whatsapp: '#25D366',
   googleBlue: '#4285F4',
@@ -51,43 +53,43 @@ export const darkColors = {
   cardBackground: palette.darkSurface,
 
   // Text
-  text: '#E6E1E5',
+  text: '#F8FAFC',
   textBlack: palette.black,
-  inputText: '#E6E1E5',
+  inputText: '#F8FAFC',
   textSecondary: palette.gray400,
-  textOnPrimary: '#381E72',
+  textOnPrimary: '#0B0F19',
   placeholder: palette.gray500,
 
   // Brand / MD3
   primary: palette.primaryDark,
-  onPrimary: '#381E72',
-  primaryContainer: '#4F378B',
-  onPrimaryContainer: '#EADDFF',
+  onPrimary: '#0B0F19',
+  primaryContainer: '#0369A1',
+  onPrimaryContainer: '#E0F2FE',
 
   accent: palette.secondaryDark,
-  onSecondary: '#332D41',
-  secondaryContainer: '#4A4458',
-  onSecondaryContainer: '#E8DEF8',
+  onSecondary: '#0F172A',
+  secondaryContainer: '#1E3A8A',
+  onSecondaryContainer: '#DBEAFE',
 
-  tertiaryContainer: '#633B48',
-  onTertiaryContainer: '#FFD8E4',
+  tertiaryContainer: '#064E3B',
+  onTertiaryContainer: '#D1FAE5',
 
   surface: palette.darkSurface,
-  onSurface: '#E6E1E5',
+  onSurface: '#F8FAFC',
   surfaceVariant: palette.darkSurfaceVariant,
-  onSurfaceVariant: '#CAC4D0',
+  onSurfaceVariant: '#94A3B8',
 
-  outline: '#938F99',
-  splashBackground: palette.primaryDark,
+  outline: '#475569',
+  splashBackground: '#0B0F19',
 
   // Feedback
   error: palette.errorDark,
-  onError: '#601410',
-  errorContainer: '#8C1D18',
-  onErrorContainer: '#F9DEDC',
-  success: '#B2EEB1',
-  warning: '#FFAB00',
-  disabled: 'rgba(230, 225, 229, 0.38)',
+  onError: '#450A0A',
+  errorContainer: '#7F1D1D',
+  onErrorContainer: '#FEE2E2',
+  success: palette.tertiaryDark,
+  warning: palette.gold,
+  disabled: 'rgba(248, 250, 252, 0.38)',
 
   // UI Elements
   border: palette.darkSurfaceVariant,
@@ -98,91 +100,92 @@ export const darkColors = {
   textLight: palette.gray400,
   transparent: palette.transparent,
   whatsapp: palette.whatsapp,
-  amber: '#FFD600',
-  amber900: '#FFAB00',
-  blue900: '#0D47A1',
-  red600: '#D32F2F',
-  statusDelivered: '#4CAF50',
-  statusCancelled: '#F44336',
-  statusDelivery: '#2196F3',
-  statusPreparing: '#FF9800',
-  statusPendingConfirmation: '#9C27B0',
+  amber: '#F59E0B',
+  amber900: '#D97706',
+  blue900: '#1E3A8A',
+  red600: '#DC2626',
+  statusDelivered: '#10B981',
+  statusCancelled: '#EF4444',
+  statusDelivery: '#38BDF8',
+  statusPreparing: '#F59E0B',
+  statusPendingConfirmation: '#8B5CF6',
   shadow: palette.black,
-  overlay: 'rgba(0,0,0,0.6)',
+  overlay: 'rgba(0,0,0,0.7)',
   whiteAlpha20: 'rgba(255,255,255,0.2)',
   whiteAlpha70: 'rgba(255,255,255,0.7)',
   whiteAlpha96: 'rgba(255,255,255,0.96)',
   googleBlue: palette.googleBlue,
-  skeleton: 'rgba(255,255,255,0.1)',
+  skeleton: 'rgba(255,255,255,0.08)',
 };
 
 export const lightColors: ThemeColors = {
   // Backgrounds
   background: palette.lightBackground,
   inputBackground: palette.lightSurfaceVariant,
-  cardBackground: palette.white,
+  cardBackground: palette.lightSurface,
 
   // Text
-  text: '#1C1B1F',
+  text: '#0F172A',
   textBlack: palette.black,
-  inputText: '#1C1B1F',
+  inputText: '#0F172A',
   textSecondary: palette.gray500,
   textOnPrimary: palette.white,
   placeholder: palette.gray400,
 
   // Brand / MD3
-  primary: palette.primary,
+  primary: '#0284C7', // Oceanic Tech Blue
   onPrimary: palette.white,
-  primaryContainer: '#EADDFF',
-  onPrimaryContainer: '#21005D',
+  primaryContainer: '#E0F2FE',
+  onPrimaryContainer: '#0369A1',
 
   accent: palette.secondary,
   onSecondary: palette.white,
-  secondaryContainer: '#E8DEF8',
-  onSecondaryContainer: '#1D192B',
+  secondaryContainer: '#DBEAFE',
+  onSecondaryContainer: '#1E40AF',
 
-  tertiaryContainer: '#FFD8E4',
-  onTertiaryContainer: '#31111D',
+  tertiaryContainer: '#D1FAE5',
+  onTertiaryContainer: '#065F46',
 
   surface: palette.lightSurface,
-  onSurface: '#1C1B1F',
+  onSurface: '#0F172A',
   surfaceVariant: palette.lightSurfaceVariant,
-  onSurfaceVariant: '#49454F',
+  onSurfaceVariant: '#64748B',
 
-  outline: '#79747E',
-  splashBackground: palette.primary,
+  outline: '#CBD5E1',
+  splashBackground: '#0F172A',
 
   // Feedback
   error: palette.error,
   onError: palette.white,
-  errorContainer: '#F9DEDC',
-  onErrorContainer: '#410E0B',
-  success: '#2E7D32',
-  warning: '#FFAB00',
-  disabled: 'rgba(28, 27, 31, 0.38)',
+  errorContainer: '#FEE2E2',
+  onErrorContainer: '#991B1B',
+  success: '#059669',
+  warning: palette.gold,
+  disabled: 'rgba(15, 23, 42, 0.38)',
 
   // UI Elements
-  border: 'rgba(0,0,0,0.08)',
+  border: '#E2E8F0',
+
   // Compat
   whiteBackground: palette.white,
-  textWhite: '#1C1B1F',
+  textWhite: '#0F172A',
   textLight: palette.gray500,
   transparent: palette.transparent,
   whatsapp: palette.whatsapp,
-  amber: '#FFD600',
-  amber900: '#FFAB00',
-  blue900: '#0D47A1',
-  red600: '#D32F2F',
-  statusDelivered: '#4CAF50',
-  statusCancelled: '#F44336',
-  statusDelivery: '#2196F3',
-  statusPreparing: '#FF9800',
-  statusPendingConfirmation: '#9C27B0',
+  amber: '#F59E0B',
+  amber900: '#D97706',
+  blue900: '#1E3A8A',
+  red600: '#DC2626',
+  statusDelivered: '#10B981',
+  statusCancelled: '#EF4444',
+  statusDelivery: '#0284C7',
+  statusPreparing: '#F59E0B',
+  statusPendingConfirmation: '#8B5CF6',
   shadow: palette.black,
   overlay: 'rgba(0,0,0,0.4)',
   whiteAlpha20: 'rgba(255,255,255,0.2)',
   whiteAlpha70: 'rgba(255,255,255,0.7)',
   googleBlue: palette.googleBlue,
   whiteAlpha96: 'rgba(255,255,255,0.96)',
-  skeleton: '#E0E0E0',
+  skeleton: '#E2E8F0',
 };

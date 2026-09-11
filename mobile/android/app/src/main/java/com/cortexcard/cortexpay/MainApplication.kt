@@ -1,4 +1,4 @@
-package com.buildshare
+package com.cortexcard.cortexpay
 
 import android.app.Application
 import android.content.res.Configuration

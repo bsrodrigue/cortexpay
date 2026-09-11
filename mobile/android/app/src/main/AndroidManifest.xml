@@ -37,8 +37,8 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="buildshare"/>
-        <data android:scheme="exp+buildshare"/>
+        <data android:scheme="cortexpay"/>
+        <data android:scheme="exp+cortexpay"/>
       </intent-filter>
     </activity>
   </application>

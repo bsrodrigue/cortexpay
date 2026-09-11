@@ -1,4 +1,4 @@
-package com.buildshare
+package com.cortexcard.cortexpay
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

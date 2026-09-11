@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="cortexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0B0F19"/>
+  <!-- Card Outline & Chip -->
+  <rect x="76" y="126" width="360" height="230" rx="24" fill="none" stroke="url(#cortexGrad)" stroke-width="14"/>
+  <rect x="116" y="186" width="60" height="46" rx="8" fill="#F59E0B"/>
+  <!-- Waves / Signal -->
+  <path d="M 330 190 A 25 25 0 0 1 330 230" fill="none" stroke="#38BDF8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M 355 175 A 45 45 0 0 1 355 245" fill="none" stroke="#38BDF8" stroke-width="8" stroke-linecap="round"/>
+  <!-- Branding Text -->
+  <text x="116" y="320" fill="#F8FAFC" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="34" letter-spacing="4">CORTEXPAY</text>
+</svg>

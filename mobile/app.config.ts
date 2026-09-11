@@ -2,12 +2,12 @@ import { ConfigContext, ExpoConfig } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'BuildShare',
-  slug: 'buildshare',
+  name: 'CortexPay',
+  slug: 'cortexpay',
   version: '1.0.1',
   orientation: 'portrait',
   icon: './assets/images/logos/buildshare_logo.png',
-  scheme: 'buildshare',
+  scheme: 'cortexpay',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   ios: {
@@ -23,17 +23,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'aps-environment': process.env.APP_VARIANT === 'production' ? 'production' : 'development',
       'com.apple.security.application-groups': ['group.com.buildshare.onesignal'],
     },
-    bundleIdentifier: 'com.buildshare',
+    bundleIdentifier: 'com.cortexcard.cortexpay',
     supportsTablet: true,
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: '#0F172A',
       foregroundImage: './assets/images/logos/buildshare_logo.png',
       monochromeImage: './assets/images/logos/buildshare_logo.png',
     },
     edgeToEdgeEnabled: true,
-    package: 'com.buildshare',
+    package: 'com.cortexcard.cortexpay',
   },
   web: {
     output: 'static',
@@ -53,9 +53,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         image: './assets/images/logos/buildshare_logo.png',
         imageWidth: 200,
         resizeMode: 'contain',
-        backgroundColor: '#1d1c22',
+        backgroundColor: '#0B0F19',
         dark: {
-          backgroundColor: '#1d1c22',
+          backgroundColor: '#0B0F19',
         },
       },
     ],
