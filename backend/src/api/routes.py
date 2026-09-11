@@ -138,6 +138,14 @@ async def issue_virtual_card(
 ):
     try:
         async with conn.transaction():
+            # Regulatory KYC Invariant: User must have verified identity (Tier >= 1)
+            user = await conn.fetchrow("SELECT kyc_status, kyc_tier FROM users WHERE user_id = $1", payload.user_id)
+            if user and (user["kyc_tier"] < 1 or user["kyc_status"] != "APPROVED"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Conformité réglementaire requise : Vous devez valider votre identité (KYC Tier 1) pour émettre une carte Visa."
+                )
+
             card = await CortexOrchestrator.create_virtual_card(
                 conn=conn,
                 user_id=payload.user_id,
@@ -145,6 +153,8 @@ async def issue_virtual_card(
                 initial_funding_usd=payload.initial_funding_usd
             )
             return card
+    except HTTPException:
+        raise
     except InsufficientFundsError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:

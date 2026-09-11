@@ -131,3 +131,63 @@ export function useSimulateMerchantDebit() {
     },
   });
 }
+
+export const KYC_QUERY_KEYS = {
+  status: (userId: string) => ['cortexpay', 'kyc', userId] as const,
+};
+
+export function useKYCStatus() {
+  const userId = useEffectiveUserId();
+  return useQuery({
+    queryKey: KYC_QUERY_KEYS.status(userId),
+    queryFn: () => cortexPayApi.getKYCStatus(userId),
+    enabled: !!userId,
+    refetchInterval: 5000,
+  });
+}
+
+export function useSubmitKYC() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: {
+      documentType: 'NATIONAL_ID' | 'PASSPORT' | 'DRIVING_LICENSE';
+      documentNumber: string;
+      frontImageUrl: string;
+      backImageUrl?: string;
+      selfieUrl: string;
+    }) =>
+      cortexPayApi.submitKYC({
+        user_id: userId,
+        document_type: params.documentType,
+        document_number: params.documentNumber,
+        country_code: 'SEN',
+        front_image_url: params.frontImageUrl,
+        back_image_url: params.backImageUrl,
+        selfie_url: params.selfieUrl,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status(userId) });
+    },
+  });
+}
+
+export function useSimulateKYCDecision() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: { decision: 'APPROVED' | 'REJECTED'; tier?: number; rejection_reason?: string }) =>
+      cortexPayApi.simulateKYCDecision({
+        user_id: userId,
+        decision: params.decision,
+        tier: params.tier ?? 1,
+        rejection_reason: params.rejection_reason,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status(userId) });
+      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+    },
+  });
+}

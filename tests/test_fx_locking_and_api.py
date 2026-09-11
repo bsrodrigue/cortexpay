@@ -177,3 +177,75 @@ async def test_card_freeze_and_refusal(client):
     assert debit_over.status_code == 200
     assert debit_over.json()["approved"] is False
     assert "insufficient" in debit_over.json()["decline_reason"].lower()
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_kyc_verification_and_card_blocking(client):
+    """
+    Validation du cycle complet de conformité KYC:
+    1. Création d'un nouvel utilisateur (Tier 0 / NOT_STARTED).
+    2. Tentative d'émission d'une carte Visa -> Bloqué 403 Forbidden.
+    3. Soumission des documents KYC (CNI / Passeport + Selfie).
+    4. Décision de validation (APPROVED / Tier 1).
+    5. Émission de la carte Visa -> Débloqué avec succès 200 OK.
+    """
+    user_email = f"kyc_user_{uuid.uuid4().hex[:8]}@cortexcard.test"
+    reg_res = await client.post("/api/auth/register/", json={
+        "email": user_email,
+        "password": "Password123!",
+        "first_name": "Cheikh",
+        "last_name": "Diop"
+    })
+    assert reg_res.status_code == 200
+    user = reg_res.json()
+    user_id = user["user_id"]
+    assert user["kyc_status"] == "NOT_STARTED"
+    assert user["kyc_tier"] == 0
+
+    # 2. Card issuance must be blocked for unverified user (Tier 0)
+    blocked_res = await client.post("/api/cards/issue", json={
+        "user_id": user_id,
+        "cardholder_name": "Cheikh Diop",
+        "initial_funding_usd": "0.0000"
+    })
+    assert blocked_res.status_code == 403
+    assert "kyc" in blocked_res.json()["detail"].lower()
+
+    # 3. Submit KYC documents
+    submit_res = await client.post("/api/kyc/submit", json={
+        "user_id": user_id,
+        "document_type": "NATIONAL_ID",
+        "document_number": "1002200192931",
+        "country_code": "SEN",
+        "front_image_url": "https://storage.cortexcard.test/kyc/front.jpg",
+        "back_image_url": "https://storage.cortexcard.test/kyc/back.jpg",
+        "selfie_url": "https://storage.cortexcard.test/kyc/selfie.jpg"
+    })
+    assert submit_res.status_code == 200
+    assert submit_res.json()["status"] == "SUBMITTED"
+
+    # Verify status changed to SUBMITTED
+    status_res = await client.get(f"/api/kyc/status/{user_id}")
+    assert status_res.status_code == 200
+    assert status_res.json()["kyc_status"] == "SUBMITTED"
+    assert len(status_res.json()["documents"]) == 1
+
+    # 4. Admin / OCR Approval (simulate approved Tier 1)
+    approve_res = await client.post("/api/kyc/simulate-decision", json={
+        "user_id": user_id,
+        "decision": "APPROVED",
+        "tier": 1
+    })
+    assert approve_res.status_code == 200
+    assert approve_res.json()["kyc_status"] == "APPROVED"
+    assert approve_res.json()["kyc_tier"] == 1
+
+    # 5. Issue card now succeeds!
+    card_res = await client.post("/api/cards/issue", json={
+        "user_id": user_id,
+        "cardholder_name": "Cheikh Diop",
+        "initial_funding_usd": "0.0000"
+    })
+    assert card_res.status_code == 200
+    assert "card_id" in card_res.json()
+    assert card_res.json()["status"] == "ACTIVE"
+

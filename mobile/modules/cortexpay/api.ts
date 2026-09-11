@@ -24,6 +24,10 @@ import {
   VirtualCardSchema,
   WalletsResponse,
   WalletsResponseSchema,
+  KYCStatusResponse,
+  KYCStatusResponseSchema,
+  KYCSubmitRequest,
+  KYCSubmitRequestSchema,
 } from './types';
 
 import * as z from 'zod';
@@ -103,5 +107,30 @@ export const cortexPayApi = {
     const validatedInput = MerchantDebitRequestSchema.parse(params);
     const response = await http.post<MerchantDebitResponse>('/cards/simulate-merchant-debit', validatedInput);
     return validateModel(MerchantDebitResponseSchema, response, 'Merchant Debit');
+  },
+
+  /**
+   * Fetch KYC Verification Status
+   */
+  async getKYCStatus(userId: string): Promise<KYCStatusResponse> {
+    const response = await http.get<KYCStatusResponse>(`/kyc/status/${userId}`);
+    return validateModel(KYCStatusResponseSchema, response, 'KYC Status');
+  },
+
+  /**
+   * Submit Identity Verification Documents (Tier 1)
+   */
+  async submitKYC(params: KYCSubmitRequest): Promise<{ document_id: string; status: string; message: string }> {
+    const validatedInput = KYCSubmitRequestSchema.parse(params);
+    const response = await http.post<{ document_id: string; status: string; message: string }>('/kyc/submit', validatedInput);
+    return response;
+  },
+
+  /**
+   * Simulate KYC Approval / Rejection (Demo & MVP Test)
+   */
+  async simulateKYCDecision(params: { user_id: string; decision: 'APPROVED' | 'REJECTED'; tier?: number; rejection_reason?: string }) {
+    const response = await http.post('/kyc/simulate-decision', params);
+    return response;
   },
 };

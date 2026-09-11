@@ -130,3 +130,38 @@ export const MerchantDebitResponseSchema = z.object({
   card_balance: z.union([z.string(), z.number()]).transform((val) => String(val)),
 });
 export type MerchantDebitResponse = z.infer<typeof MerchantDebitResponseSchema>;
+
+// 6. KYC Verification Models
+export const KYCDocumentSchema = z.object({
+  id: z.string(),
+  document_type: z.string(),
+  document_number: z.string(),
+  country_code: z.string(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
+  submitted_at: z.string(),
+  reviewed_at: z.string().nullable().optional(),
+  rejection_reason: z.string().nullable().optional(),
+});
+export type KYCDocument = z.infer<typeof KYCDocumentSchema>;
+
+export const KYCStatusResponseSchema = z.object({
+  user_id: z.string(),
+  kyc_status: z.enum(['NOT_STARTED', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED']),
+  kyc_tier: z.number(),
+  kyc_submitted_at: z.string().nullable().optional(),
+  kyc_reviewed_at: z.string().nullable().optional(),
+  kyc_rejection_reason: z.string().nullable().optional(),
+  documents: z.array(KYCDocumentSchema).default([]),
+});
+export type KYCStatusResponse = z.infer<typeof KYCStatusResponseSchema>;
+
+export const KYCSubmitRequestSchema = z.object({
+  user_id: z.string(),
+  document_type: z.enum(['NATIONAL_ID', 'PASSPORT', 'DRIVING_LICENSE']),
+  document_number: z.string().min(5),
+  country_code: z.string().default('SEN'),
+  front_image_url: z.string(),
+  back_image_url: z.string().optional(),
+  selfie_url: z.string(),
+});
+export type KYCSubmitRequest = z.infer<typeof KYCSubmitRequestSchema>;

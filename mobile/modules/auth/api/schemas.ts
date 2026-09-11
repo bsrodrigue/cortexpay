@@ -12,6 +12,9 @@ export const UserSchema = z.object({
   last_name: z.string(),
   is_staff: z.boolean().optional(),
   is_verified: z.boolean(),
+  kyc_status: z.enum(['NOT_STARTED', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED']).optional().default('NOT_STARTED'),
+  kyc_tier: z.number().optional().default(0),
+  kyc_rejection_reason: z.string().nullable().optional(),
   created_at: z.string(),
 });
 

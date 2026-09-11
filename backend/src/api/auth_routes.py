@@ -50,7 +50,7 @@ async def register(payload: RegisterDTO, conn: asyncpg.Connection = Depends(get_
         """
         INSERT INTO users (user_id, email, password_hash, first_name, last_name, is_verified, is_staff, created_at)
         VALUES ($1, $2, $3, $4, $5, TRUE, FALSE, NOW())
-        RETURNING id, user_id, email, first_name, last_name, is_verified, is_staff, created_at;
+        RETURNING id, user_id, email, first_name, last_name, is_verified, is_staff, kyc_status, kyc_tier, kyc_rejection_reason, created_at;
         """,
         user_id,
         payload.email.lower(),
@@ -106,7 +106,7 @@ async def get_current_user(
     if len(parts) >= 3 and parts[0] == "cortex" and parts[1] == "access":
         user_id = parts[2]
         user = await conn.fetchrow(
-            "SELECT id, user_id, email, first_name, last_name, is_verified, is_staff, created_at FROM users WHERE user_id = $1",
+            "SELECT id, user_id, email, first_name, last_name, is_verified, is_staff, kyc_status, kyc_tier, kyc_rejection_reason, created_at FROM users WHERE user_id = $1",
             user_id
         )
         if user:
@@ -116,7 +116,7 @@ async def get_current_user(
 
     # Fallback to the latest user if in local mock mode
     latest = await conn.fetchrow(
-        "SELECT id, user_id, email, first_name, last_name, is_verified, is_staff, created_at FROM users ORDER BY id DESC LIMIT 1"
+        "SELECT id, user_id, email, first_name, last_name, is_verified, is_staff, kyc_status, kyc_tier, kyc_rejection_reason, created_at FROM users ORDER BY id DESC LIMIT 1"
     )
     if latest:
         data = dict(latest)

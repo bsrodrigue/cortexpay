@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, View, StyleSheet, RefreshControl, Alert } from 'react-native';
-import { Text, Surface, Button, Portal, Modal, TextInput, IconButton } from 'react-native-paper';
+import { Text, Surface, Button, Portal, Modal, TextInput, IconButton, Banner } from 'react-native-paper';
 import { useThemedStyles, Theme } from '@/modules/shared/theme';
 import { SideMenu } from '@/modules/shared/components/SideMenu';
 import { useAuthStore } from '@/modules/auth/store';
@@ -14,11 +14,15 @@ import {
   useIssueCard,
   useToggleFreezeCard,
   useSimulateMerchantDebit,
+  useKYCStatus,
+  useSubmitKYC,
+  useSimulateKYCDecision,
 } from '../hooks';
 import { VirtualCardView } from '../components/VirtualCardView';
 import { ConvertModal } from '../components/ConvertModal';
 import { DepositModal } from '../components/DepositModal';
 import { SimulatorPanel } from '../components/SimulatorPanel';
+import { KYCVerificationModal } from '../components/KYCVerificationModal';
 
 export const CortexDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -29,6 +33,7 @@ export const CortexDashboardScreen: React.FC = () => {
   // Queries
   const { data: walletsData, isLoading: isLoadingWallets, refetch: refetchWallets } = useWallets();
   const { data: cards, isLoading: isLoadingCards, refetch: refetchCards } = useUserCards();
+  const { data: kycData, refetch: refetchKYC } = useKYCStatus();
 
   // Mutations
   const depositMutation = useDepositMobileMoney();
@@ -37,12 +42,15 @@ export const CortexDashboardScreen: React.FC = () => {
   const issueCardMutation = useIssueCard();
   const freezeMutation = useToggleFreezeCard();
   const debitMutation = useSimulateMerchantDebit();
+  const submitKYCMutation = useSubmitKYC();
+  const simulateKYCDecisionMutation = useSimulateKYCDecision();
 
   // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
   const [convertModalVisible, setConvertModalVisible] = useState(false);
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [simulatorModalVisible, setSimulatorModalVisible] = useState(false);
+  const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const [cardholderName, setCardholderName] = useState(
     user ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Solo Dev Lead'
@@ -52,9 +60,20 @@ export const CortexDashboardScreen: React.FC = () => {
   const xofWallet = walletsData?.wallets?.XOF;
   const usdWallet = walletsData?.wallets?.USD;
 
+  const isKYCApproved = kycData?.kyc_status === 'APPROVED' || (kycData?.kyc_tier ?? 0) >= 1;
+
   const handleRefresh = () => {
     refetchWallets();
     refetchCards();
+    refetchKYC();
+  };
+
+  const handleOpenIssueCard = () => {
+    if (!isKYCApproved) {
+      setKycModalVisible(true);
+      return;
+    }
+    setIssueModalVisible(true);
   };
 
   const handleIssueCardSubmit = async () => {
@@ -66,7 +85,12 @@ export const CortexDashboardScreen: React.FC = () => {
       setIssueModalVisible(false);
       Alert.alert('Succès', 'Carte virtuelle USD émise et provisionnée avec succès !');
     } catch (e: any) {
-      Alert.alert('Erreur', e?.response?.data?.detail || e.message);
+      if (e?.response?.status === 403) {
+        setIssueModalVisible(false);
+        setKycModalVisible(true);
+      } else {
+        Alert.alert('Erreur', e?.response?.data?.detail || e.message);
+      }
     }
   };
 
@@ -164,6 +188,30 @@ export const CortexDashboardScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* KYC Compliance Banner if not Tier 1 approved */}
+        {!isKYCApproved && (
+          <Surface style={styles.kycBanner} elevation={1}>
+            <View style={styles.kycBannerLeft}>
+              <Text variant="labelLarge" style={styles.kycBannerTitle}>
+                🛡️ Conformité Réglementaire (KYC)
+              </Text>
+              <Text variant="bodySmall" style={styles.kycBannerSubtitle}>
+                {kycData?.kyc_status === 'SUBMITTED'
+                  ? 'Pièces d\'identité en cours d\'examen.'
+                  : 'Vérifiez votre identité pour débloquer les cartes Visa USD.'}
+              </Text>
+            </View>
+            <Button
+              mode="contained-tonal"
+              compact
+              onPress={() => setKycModalVisible(true)}
+              style={styles.kycBannerBtn}
+            >
+              {kycData?.kyc_status === 'SUBMITTED' ? 'Voir l\'état' : 'Vérifier'}
+            </Button>
+          </Surface>
+        )}
+
         {/* Wallets Overview */}
         <View style={styles.walletsRow}>
           <Surface style={styles.walletCard} elevation={2}>
@@ -208,7 +256,7 @@ export const CortexDashboardScreen: React.FC = () => {
           <Button
             mode="outlined"
             icon="credit-card-plus-outline"
-            onPress={() => setIssueModalVisible(true)}
+            onPress={handleOpenIssueCard}
             style={styles.actionBtn}
             contentStyle={styles.actionBtnContent}
           >
@@ -235,20 +283,38 @@ export const CortexDashboardScreen: React.FC = () => {
         ) : (
           <Surface style={styles.emptyCardContainer} elevation={1}>
             <Text variant="bodyMedium" style={styles.emptyText}>
-              Vous n'avez pas encore de carte virtuelle USD active.
+              {isKYCApproved
+                ? "Vous n'avez pas encore de carte virtuelle USD active."
+                : 'Effectuez votre vérification d\'identité pour émettre votre première carte Visa.'}
             </Text>
             <Button
               mode="contained"
-              icon="credit-card-plus"
-              onPress={() => setIssueModalVisible(true)}
+              icon={isKYCApproved ? 'credit-card-plus' : 'shield-account'}
+              onPress={handleOpenIssueCard}
               style={styles.emptyBtn}
             >
-              Créer ma 1ère Carte Virtuelle USD
+              {isKYCApproved ? 'Créer ma 1ère Carte Virtuelle USD' : 'Valider mon identité (KYC)'}
             </Button>
           </Surface>
         )}
 
-        {/* Convert Modal (with background quote locking) */}
+        {/* KYC Modal */}
+        <KYCVerificationModal
+          visible={kycModalVisible}
+          onDismiss={() => setKycModalVisible(false)}
+          kycData={kycData}
+          onSubmitKYC={async (params) => {
+            await submitKYCMutation.mutateAsync(params);
+            Alert.alert('Documents Reçus', 'Vos pièces d\'identité sont enregistrées.');
+          }}
+          onSimulateDecision={async (decision, tier, reason) => {
+            await simulateKYCDecisionMutation.mutateAsync({ decision, tier, rejection_reason: reason });
+            Alert.alert('Statut KYC mis à jour', `Décision appliquée : ${decision}`);
+          }}
+          isSubmitting={submitKYCMutation.isPending}
+        />
+
+        {/* Convert Modal */}
         <ConvertModal
           visible={convertModalVisible}
           onDismiss={() => setConvertModalVisible(false)}
@@ -362,6 +428,34 @@ const createStyles = (theme: Theme) =>
     },
     appSubtitle: {
       color: theme.colors.onSurfaceVariant,
+    },
+    kycBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: '#EFF6FF',
+      borderLeftWidth: 4,
+      borderLeftColor: '#2563EB',
+      marginBottom: 16,
+    },
+    kycBannerLeft: {
+      flex: 1,
+      marginRight: 8,
+    },
+    kycBannerTitle: {
+      fontWeight: 'bold',
+      color: '#1E40AF',
+      fontSize: 13,
+    },
+    kycBannerSubtitle: {
+      color: '#3B82F6',
+      fontSize: 11,
+      marginTop: 2,
+    },
+    kycBannerBtn: {
+      borderRadius: 8,
     },
     walletsRow: {
       flexDirection: 'row',
