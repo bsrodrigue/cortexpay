@@ -4,6 +4,7 @@ import { Text, Surface, Button, Portal, Modal, TextInput, IconButton } from 'rea
 import { useThemedStyles, Theme } from '@/modules/shared/theme';
 import { SideMenu } from '@/modules/shared/components/SideMenu';
 import { useAuthStore } from '@/modules/auth/store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useWallets,
   useUserCards,
@@ -20,6 +21,7 @@ import { DepositModal } from '../components/DepositModal';
 import { SimulatorPanel } from '../components/SimulatorPanel';
 
 export const CortexDashboardScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(createStyles);
   const { user } = useAuthStore();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -128,11 +130,11 @@ export const CortexDashboardScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.rootWrapper}>
+    <View style={[styles.rootWrapper, { paddingTop: insets.top }]}>
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 40 }]}
         refreshControl={<RefreshControl refreshing={isLoadingWallets || isLoadingCards} onRefresh={handleRefresh} />}
       >
         {/* Header & Greeting */}
