@@ -238,14 +238,15 @@ class CortexOrchestrator:
         )
 
         # Store in virtual_cards
-        await conn.execute(
+        row = await conn.fetchrow(
             """
             INSERT INTO virtual_cards (
                 card_id, user_id, account_id, currency, masked_pan, encrypted_pan,
                 expiry_month, expiry_year, cvv, cardholder_name, status,
                 spending_limit_monthly, current_month_spent
             )
-            VALUES ($1, $2, $3, 'USD', $4, $5, $6, $7, $8, $9, 'ACTIVE', $10, 0.0000);
+            VALUES ($1, $2, $3, 'USD', $4, $5, $6, $7, $8, $9, 'ACTIVE', $10, 0.0000)
+            RETURNING created_at, id;
             """,
             card_id,
             user_id,
@@ -289,10 +290,12 @@ class CortexOrchestrator:
 
         return {
             **card_meta,
+            "id": str(row["id"]),
             "account_id": card_account["id"],
             "status": "ACTIVE",
             "balance": card_account_updated["balance"],
-            "current_month_spent": Decimal("0.0000")
+            "current_month_spent": Decimal("0.0000"),
+            "created_at": row["created_at"].isoformat() if row and row["created_at"] else None,
         }
 
     @staticmethod

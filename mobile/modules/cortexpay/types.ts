@@ -102,7 +102,7 @@ export const VirtualCardSchema = z.object({
   balance: z.union([z.string(), z.number()]).transform((val) => String(val)),
   spending_limit_monthly: z.union([z.string(), z.number()]).transform((val) => String(val)),
   current_month_spent: z.union([z.string(), z.number()]).transform((val) => String(val)),
-  created_at: z.string(),
+  created_at: z.string().optional().default(() => new Date().toISOString()),
 });
 export type VirtualCard = z.infer<typeof VirtualCardSchema>;
 
