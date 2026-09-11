@@ -15,7 +15,8 @@ import {
   useSimulateMerchantDebit,
 } from '../hooks';
 import { VirtualCardView } from '../components/VirtualCardView';
-import { FXQuoteWidget } from '../components/FXQuoteWidget';
+import { ConvertModal } from '../components/ConvertModal';
+import { DepositModal } from '../components/DepositModal';
 import { SimulatorPanel } from '../components/SimulatorPanel';
 
 export const CortexDashboardScreen: React.FC = () => {
@@ -35,9 +36,15 @@ export const CortexDashboardScreen: React.FC = () => {
   const freezeMutation = useToggleFreezeCard();
   const debitMutation = useSimulateMerchantDebit();
 
-  // Issue card modal state
+  // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
-  const [cardholderName, setCardholderName] = useState('Solo Dev Lead');
+  const [convertModalVisible, setConvertModalVisible] = useState(false);
+  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [simulatorModalVisible, setSimulatorModalVisible] = useState(false);
+
+  const [cardholderName, setCardholderName] = useState(
+    user ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Solo Dev Lead'
+  );
   const [initialFunding, setInitialFunding] = useState('25.00');
 
   const xofWallet = walletsData?.wallets?.XOF;
@@ -61,7 +68,7 @@ export const CortexDashboardScreen: React.FC = () => {
     }
   };
 
-  const handleSimulateDeposit = async (
+  const handleDepositSubmit = async (
     operator: 'WAVE' | 'ORANGE_MONEY',
     amount: string,
     phone: string,
@@ -74,9 +81,20 @@ export const CortexDashboardScreen: React.FC = () => {
         phone_number: phone,
         otp_code: otp,
       });
-      Alert.alert('Recharge Réussie', `+${amount} XOF crédités via ${operator} Push USSD.`);
+      Alert.alert('Recharge Réussie', `+${Number(amount).toLocaleString()} XOF crédités via ${operator}.`);
     } catch (e: any) {
       Alert.alert('Échec Recharge', e?.response?.data?.detail || e.message);
+      throw e;
+    }
+  };
+
+  const handleConvertSubmit = async (quoteId: string) => {
+    try {
+      await convertMutation.mutateAsync({ quoteId });
+      Alert.alert('Succès', 'Conversion effectuée instantanément au taux garanti.');
+    } catch (e: any) {
+      Alert.alert('Échec Conversion', e?.response?.data?.detail || e.message);
+      throw e;
     }
   };
 
@@ -117,7 +135,7 @@ export const CortexDashboardScreen: React.FC = () => {
         contentContainerStyle={styles.contentContainer}
         refreshControl={<RefreshControl refreshing={isLoadingWallets || isLoadingCards} onRefresh={handleRefresh} />}
       >
-        {/* Header & Wallets Overview */}
+        {/* Header & Greeting */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
             <IconButton
@@ -131,120 +149,179 @@ export const CortexDashboardScreen: React.FC = () => {
                 CortexPay
               </Text>
               <Text variant="bodySmall" style={styles.appSubtitle}>
-                {user ? `Bonjour, ${user.first_name}` : 'FinTech Ledger Multi-Devises'}
+                {user ? `Bonjour, ${user.first_name}` : 'FinTech Multi-Devises'}
               </Text>
             </View>
+            <IconButton
+              icon="flask-outline"
+              size={22}
+              iconColor="#6B7280"
+              onPress={() => setSimulatorModalVisible(true)}
+              accessibilityLabel="Mode Test / Sandbox"
+            />
           </View>
         </View>
 
-      <View style={styles.walletsRow}>
-        <Surface style={styles.walletCard} elevation={2}>
-          <Text variant="labelMedium" style={styles.walletLabel}>
-            PORTEFEUILLE XOF
-          </Text>
-          <Text variant="headlineSmall" style={styles.walletAmount}>
-            {Number(xofWallet?.balance || 0).toLocaleString()} XOF
-          </Text>
-        </Surface>
+        {/* Wallets Overview */}
+        <View style={styles.walletsRow}>
+          <Surface style={styles.walletCard} elevation={2}>
+            <Text variant="labelMedium" style={styles.walletLabel}>
+              PORTEFEUILLE XOF
+            </Text>
+            <Text variant="headlineSmall" style={styles.walletAmount}>
+              {Number(xofWallet?.balance || 0).toLocaleString()} XOF
+            </Text>
+          </Surface>
 
-        <Surface style={styles.walletCard} elevation={2}>
-          <Text variant="labelMedium" style={styles.walletLabel}>
-            PORTEFEUILLE USD
-          </Text>
-          <Text variant="headlineSmall" style={styles.walletAmountUsd}>
-            ${Number(usdWallet?.balance || 0).toFixed(2)} USD
-          </Text>
-        </Surface>
-      </View>
+          <Surface style={styles.walletCard} elevation={2}>
+            <Text variant="labelMedium" style={styles.walletLabel}>
+              PORTEFEUILLE USD
+            </Text>
+            <Text variant="headlineSmall" style={styles.walletAmountUsd}>
+              ${Number(usdWallet?.balance || 0).toFixed(2)} USD
+            </Text>
+          </Surface>
+        </View>
 
-      {/* FX Quote Locking Widget */}
-      <FXQuoteWidget
-        xofBalance={xofWallet?.balance || '0'}
-        onGetQuote={async (amt) => fxQuoteMutation.mutateAsync({ from_amount_xof: amt })}
-        onExecuteConvert={async (quoteId) => {
-          await convertMutation.mutateAsync({ quoteId });
-          Alert.alert('Succès FX', 'Conversion de devises effectuée avec succès.');
-        }}
-        isGettingQuote={fxQuoteMutation.isPending}
-        isConverting={convertMutation.isPending}
-      />
-
-      {/* Cards Section */}
-      <View style={styles.sectionHeader}>
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          Cartes Virtuelles USD ({cards?.length || 0})
-        </Text>
-        <Button mode="contained-tonal" onPress={() => setIssueModalVisible(true)} icon="plus">
-          Nouvelle Carte
-        </Button>
-      </View>
-
-      {cards && cards.length > 0 ? (
-        cards.map((c) => (
-          <VirtualCardView
-            key={c.card_id}
-            card={c}
-            onToggleFreeze={(cardId) => freezeMutation.mutate(cardId)}
-            isFreezing={freezeMutation.isPending}
-          />
-        ))
-      ) : (
-        <Surface style={styles.emptyCardContainer} elevation={1}>
-          <Text variant="bodyMedium" style={styles.emptyText}>
-            Aucune carte virtuelle émise pour l'instant.
-          </Text>
-          <Button mode="contained" onPress={() => setIssueModalVisible(true)} style={styles.emptyBtn}>
-            Créer ma 1ère Carte Virtuelle USD
-          </Button>
-        </Surface>
-      )}
-
-      {/* Simulator Console */}
-      <SimulatorPanel
-        cards={cards || []}
-        onSimulateDeposit={handleSimulateDeposit}
-        onSimulateDebit={handleSimulateDebit}
-        isDepositing={depositMutation.isPending}
-        isDebiting={debitMutation.isPending}
-      />
-
-      {/* Issue Card Modal */}
-      <Portal>
-        <Modal
-          visible={issueModalVisible}
-          onDismiss={() => setIssueModalVisible(false)}
-          contentContainerStyle={styles.modalContent}
-        >
-          <Text variant="titleLarge" style={styles.modalTitle}>
-            Émission Carte Virtuelle USD
-          </Text>
-          <TextInput
-            label="Nom du titulaire"
-            value={cardholderName}
-            onChangeText={setCardholderName}
-            mode="outlined"
-            style={styles.modalInput}
-          />
-          <TextInput
-            label="Provisionnement initial (USD)"
-            value={initialFunding}
-            onChangeText={setInitialFunding}
-            keyboardType="numeric"
-            mode="outlined"
-            style={styles.modalInput}
-          />
+        {/* Consumer Quick Actions */}
+        <View style={styles.quickActionsContainer}>
           <Button
             mode="contained"
-            onPress={handleIssueCardSubmit}
-            loading={issueCardMutation.isPending}
-            disabled={issueCardMutation.isPending}
-            style={styles.modalBtn}
+            icon="plus"
+            onPress={() => setDepositModalVisible(true)}
+            style={styles.actionBtn}
+            contentStyle={styles.actionBtnContent}
           >
-            Émettre la carte
+            Recharger
           </Button>
-        </Modal>
-      </Portal>
-    </ScrollView>
+          <Button
+            mode="contained-tonal"
+            icon="swap-horizontal"
+            onPress={() => setConvertModalVisible(true)}
+            style={styles.actionBtn}
+            contentStyle={styles.actionBtnContent}
+          >
+            Convertir
+          </Button>
+          <Button
+            mode="outlined"
+            icon="credit-card-plus-outline"
+            onPress={() => setIssueModalVisible(true)}
+            style={styles.actionBtn}
+            contentStyle={styles.actionBtnContent}
+          >
+            + Carte
+          </Button>
+        </View>
+
+        {/* Cards Section */}
+        <View style={styles.sectionHeader}>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
+            Mes Cartes Virtuelles USD ({cards?.length || 0})
+          </Text>
+        </View>
+
+        {cards && cards.length > 0 ? (
+          cards.map((c) => (
+            <VirtualCardView
+              key={c.card_id}
+              card={c}
+              onToggleFreeze={(cardId) => freezeMutation.mutate(cardId)}
+              isFreezing={freezeMutation.isPending}
+            />
+          ))
+        ) : (
+          <Surface style={styles.emptyCardContainer} elevation={1}>
+            <Text variant="bodyMedium" style={styles.emptyText}>
+              Vous n'avez pas encore de carte virtuelle USD active.
+            </Text>
+            <Button
+              mode="contained"
+              icon="credit-card-plus"
+              onPress={() => setIssueModalVisible(true)}
+              style={styles.emptyBtn}
+            >
+              Créer ma 1ère Carte Virtuelle USD
+            </Button>
+          </Surface>
+        )}
+
+        {/* Convert Modal (with background quote locking) */}
+        <ConvertModal
+          visible={convertModalVisible}
+          onDismiss={() => setConvertModalVisible(false)}
+          xofBalance={xofWallet?.balance || '0'}
+          onGetQuote={async (amt) => fxQuoteMutation.mutateAsync({ from_amount_xof: amt })}
+          onExecuteConvert={handleConvertSubmit}
+          isGettingQuote={fxQuoteMutation.isPending}
+          isConverting={convertMutation.isPending}
+        />
+
+        {/* Deposit Modal */}
+        <DepositModal
+          visible={depositModalVisible}
+          onDismiss={() => setDepositModalVisible(false)}
+          onDeposit={handleDepositSubmit}
+          isDepositing={depositMutation.isPending}
+        />
+
+        {/* Sandbox / Simulator Modal */}
+        <Portal>
+          <Modal
+            visible={simulatorModalVisible}
+            onDismiss={() => setSimulatorModalVisible(false)}
+            contentContainerStyle={styles.simulatorModalContent}
+          >
+            <View style={styles.modalCloseRow}>
+              <IconButton icon="close" size={20} onPress={() => setSimulatorModalVisible(false)} />
+            </View>
+            <SimulatorPanel
+              cards={cards || []}
+              onSimulateDeposit={handleDepositSubmit}
+              onSimulateDebit={handleSimulateDebit}
+              isDepositing={depositMutation.isPending}
+              isDebiting={debitMutation.isPending}
+            />
+          </Modal>
+        </Portal>
+
+        {/* Issue Card Modal */}
+        <Portal>
+          <Modal
+            visible={issueModalVisible}
+            onDismiss={() => setIssueModalVisible(false)}
+            contentContainerStyle={styles.modalContent}
+          >
+            <Text variant="titleLarge" style={styles.modalTitle}>
+              Créer une Carte Virtuelle USD
+            </Text>
+            <TextInput
+              label="Nom du titulaire"
+              value={cardholderName}
+              onChangeText={setCardholderName}
+              mode="outlined"
+              style={styles.modalInput}
+            />
+            <TextInput
+              label="Provisionnement initial (USD)"
+              value={initialFunding}
+              onChangeText={setInitialFunding}
+              keyboardType="numeric"
+              mode="outlined"
+              style={styles.modalInput}
+            />
+            <Button
+              mode="contained"
+              onPress={handleIssueCardSubmit}
+              loading={issueCardMutation.isPending}
+              disabled={issueCardMutation.isPending}
+              style={styles.modalBtn}
+            >
+              Émettre la carte
+            </Button>
+          </Modal>
+        </Portal>
+      </ScrollView>
     </View>
   );
 };
@@ -287,7 +364,7 @@ const createStyles = (theme: Theme) =>
     walletsRow: {
       flexDirection: 'row',
       gap: 12,
-      marginBottom: 14,
+      marginBottom: 16,
     },
     walletCard: {
       flex: 1,
@@ -310,12 +387,23 @@ const createStyles = (theme: Theme) =>
       marginTop: 4,
       color: '#16A34A',
     },
+    quickActionsContainer: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 20,
+    },
+    actionBtn: {
+      flex: 1,
+      borderRadius: 12,
+    },
+    actionBtnContent: {
+      paddingVertical: 4,
+    },
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: 16,
-      marginBottom: 8,
+      marginBottom: 12,
     },
     sectionTitle: {
       fontWeight: 'bold',
@@ -330,7 +418,8 @@ const createStyles = (theme: Theme) =>
     },
     emptyText: {
       color: theme.colors.onSurfaceVariant,
-      marginBottom: 12,
+      marginBottom: 14,
+      textAlign: 'center',
     },
     emptyBtn: {
       marginTop: 4,
@@ -340,6 +429,15 @@ const createStyles = (theme: Theme) =>
       padding: 20,
       margin: 20,
       borderRadius: 16,
+    },
+    simulatorModalContent: {
+      backgroundColor: 'transparent',
+      margin: 10,
+    },
+    modalCloseRow: {
+      alignItems: 'flex-end',
+      marginBottom: -10,
+      zIndex: 10,
     },
     modalTitle: {
       fontWeight: 'bold',
