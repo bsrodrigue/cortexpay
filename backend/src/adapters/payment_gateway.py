@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from decimal import Decimal
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -53,7 +54,7 @@ class MockPaymentGateway:
                 message="Invalid deposit amount."
             )
 
-        tx_id = f"{request.operator[:3]}_TX_{abs(hash(request.phone_number + str(request.amount)))}"
+        tx_id = f"{request.operator[:3]}_TX_{uuid.uuid4().hex[:12]}"
         return PaymentGatewayResult(
             success=True,
             provider_tx_id=tx_id,
