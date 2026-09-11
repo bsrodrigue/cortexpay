@@ -1,15 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { createLogger } from '@/libs/log';
+import { useAuthStore } from '@/modules/auth/store';
+
 import { cortexPayApi } from './api';
+import { useCortexPayStore } from './store';
 import {
-  CardIssueRequest,
-  ConvertRequest,
   DepositRequest,
   MerchantDebitRequest,
   QuoteRequest,
 } from './types';
-import { useCortexPayStore } from './store';
-import { useAuthStore } from '@/modules/auth/store';
-import { createLogger } from '@/libs/log';
 
 const logger = createLogger('CortexPayHooks');
 
@@ -20,9 +20,9 @@ export const CORTEX_QUERY_KEYS = {
 
 function useEffectiveUserId(): string {
   const authUser = useAuthStore((state) => state.user);
+  const currentUserId = useCortexPayStore((state) => state.currentUserId);
   if (authUser?.user_id) return authUser.user_id;
   if (authUser?.id) return `usr_${authUser.id}`;
-  const currentUserId = useCortexPayStore((state) => state.currentUserId);
   return currentUserId || 'usr_cortex_demo';
 }
 
@@ -54,7 +54,7 @@ export function useDepositMobileMoney() {
       cortexPayApi.depositMobileMoney({ ...params, user_id: userId }),
     onSuccess: () => {
       logger.info('Mobile Money Deposit successful. Invalidating wallets cache.');
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
     },
     onError: (err) => {
       logger.error('Deposit error:', err);
@@ -84,7 +84,7 @@ export function useConvertCurrency() {
       }),
     onSuccess: () => {
       logger.info('FX Conversion successful. Updating wallets.');
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
     },
   });
 }
@@ -101,8 +101,8 @@ export function useIssueCard() {
         initial_funding_usd: params.initialFundingUsd,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
     },
   });
 }
@@ -114,7 +114,7 @@ export function useToggleFreezeCard() {
   return useMutation({
     mutationFn: (cardId: string) => cortexPayApi.toggleFreezeCard(cardId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
     },
   });
 }
@@ -126,8 +126,8 @@ export function useSimulateMerchantDebit() {
   return useMutation({
     mutationFn: (params: MerchantDebitRequest) => cortexPayApi.simulateMerchantDebit(params),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
     },
   });
 }
@@ -184,7 +184,7 @@ export function useSubmitKYC() {
         selfie_url: params.selfieUrl,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status(userId) });
+      void queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status(userId) });
     },
   });
 }
@@ -202,8 +202,8 @@ export function useSimulateKYCDecision() {
         rejection_reason: params.rejection_reason,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status(userId) });
-      queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+      void queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
     },
   });
 }

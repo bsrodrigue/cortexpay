@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, SegmentedButtons, Surface, HelperText } from 'react-native-paper';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
+
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
+
 import { KYCStatusResponse } from '../types';
 
 interface KYCVerificationModalProps {
@@ -34,23 +36,27 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
 
   const status = kycData?.kyc_status || 'NOT_STARTED';
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!docNumber || docNumber.trim().length < 5) {
       setError('Veuillez renseigner un numéro de pièce valide.');
       return;
     }
     setError(null);
-    try {
-      await onSubmitKYC({
-        documentType: docType,
-        documentNumber: docNumber.trim(),
-        frontImageUrl: 'https://mock.storage.cortexcard.sn/kyc/cni_front.jpg',
-        backImageUrl: 'https://mock.storage.cortexcard.sn/kyc/cni_back.jpg',
-        selfieUrl: 'https://mock.storage.cortexcard.sn/kyc/selfie.jpg',
-      });
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message);
-    }
+    void onSubmitKYC({
+      documentType: docType,
+      documentNumber: docNumber.trim(),
+      frontImageUrl: 'https://mock.storage.cortexcard.sn/kyc/cni_front.jpg',
+      backImageUrl: 'https://mock.storage.cortexcard.sn/kyc/cni_back.jpg',
+      selfieUrl: 'https://mock.storage.cortexcard.sn/kyc/selfie.jpg',
+    }).catch((e: unknown) => {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      setError(err.response?.data?.detail || err.message || 'Erreur soumission');
+    });
+  };
+
+  const handleSimulate = (decision: 'APPROVED' | 'REJECTED', tier?: number, reason?: string) => {
+    if (!onSimulateDecision) return;
+    void onSimulateDecision(decision, tier, reason);
   };
 
   const getStatusBadgeStyle = () => {
@@ -72,10 +78,10 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.modal}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text variant="headlineSmall" style={styles.title}>
-            Vérification d'Identité (KYC)
+            Vérification d&apos;Identité (KYC)
           </Text>
           <Text variant="bodySmall" style={styles.subtitle}>
-            Conformité BCEAO / UEMOA requise pour l'activation et le provisionnement des cartes Visa USD.
+            Conformité BCEAO / UEMOA requise pour l&apos;activation et le provisionnement des cartes Visa USD.
           </Text>
 
           {/* Status Badge */}
@@ -102,7 +108,7 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
           ) : status === 'SUBMITTED' ? (
             <View style={styles.pendingSection}>
               <Text variant="bodyMedium" style={styles.pendingText}>
-                Vos pièces d'identité ont été enregistrées. La validation automatique prend généralement quelques instants.
+                Vos pièces d&apos;identité ont été enregistrées. La validation automatique prend généralement quelques instants.
               </Text>
 
               {/* Dev Simulation Tools for testing */}
@@ -116,7 +122,7 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
                       mode="contained-tonal"
                       buttonColor="#DCFCE7"
                       textColor="#166534"
-                      onPress={() => onSimulateDecision('APPROVED', 1)}
+                      onPress={() => handleSimulate('APPROVED', 1)}
                     >
                       Approuver Tier 1
                     </Button>
@@ -124,7 +130,7 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
                       mode="contained-tonal"
                       buttonColor="#FEE2E2"
                       textColor="#991B1B"
-                      onPress={() => onSimulateDecision('REJECTED', 0, 'Photo de la pièce illisible')}
+                      onPress={() => handleSimulate('REJECTED', 0, 'Photo de la pièce illisible')}
                     >
                       Refuser
                     </Button>
@@ -143,7 +149,7 @@ export const KYCVerificationModal: React.FC<KYCVerificationModalProps> = ({
               </Text>
               <SegmentedButtons
                 value={docType}
-                onValueChange={(val) => setDocType(val as any)}
+                onValueChange={(val) => setDocType(val as 'NATIONAL_ID' | 'PASSPORT' | 'DRIVING_LICENSE')}
                 buttons={[
                   { value: 'NATIONAL_ID', label: 'CNI CEDEAO' },
                   { value: 'PASSPORT', label: 'Passeport' },

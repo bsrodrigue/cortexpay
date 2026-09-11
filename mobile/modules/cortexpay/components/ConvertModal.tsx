@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, ProgressBar, HelperText, Surface } from 'react-native-paper';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Button, HelperText, Modal, Portal, ProgressBar, Surface, Text, TextInput } from 'react-native-paper';
+
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
+
 import { FXQuoteResponse } from '../types';
 
 interface ConvertModalProps {
@@ -54,19 +56,22 @@ export const ConvertModal: React.FC<ConvertModalProps> = ({
     setQuoteError(null);
 
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(async () => {
-      try {
-        const quote = await onGetQuote(amountXof);
-        setActiveQuote(quote);
-      } catch (err: any) {
-        setQuoteError(err?.response?.data?.detail || 'Impossible de calculer le taux');
-      }
+    debounceTimer.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const quote = await onGetQuote(amountXof);
+          setActiveQuote(quote);
+        } catch (err: unknown) {
+          const apiError = err as { response?: { data?: { detail?: string } } };
+          setQuoteError(apiError.response?.data?.detail || 'Impossible de calculer le taux');
+        }
+      })();
     }, 400);
 
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [visible, amountXof, xofBalance]);
+  }, [visible, amountXof, xofBalance, onGetQuote]);
 
   // Countdown for quote validity
   useEffect(() => {
@@ -87,14 +92,15 @@ export const ConvertModal: React.FC<ConvertModalProps> = ({
     return () => clearInterval(interval);
   }, [activeQuote]);
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (!activeQuote) return;
-    try {
-      await onExecuteConvert(activeQuote.quote_id);
-      onDismiss();
-    } catch (e) {
-      console.error(e);
-    }
+    void onExecuteConvert(activeQuote.quote_id)
+      .then(() => {
+        onDismiss();
+      })
+      .catch((e) => {
+        console.error(e);
+      });
   };
 
   const progress = secondsRemaining / 90;
@@ -164,7 +170,7 @@ export const ConvertModal: React.FC<ConvertModalProps> = ({
             buttonColor="#16A34A"
             style={styles.confirmBtn}
           >
-            Confirmer l'échange
+            Confirmer l&apos;échange
           </Button>
         </View>
       </Modal>

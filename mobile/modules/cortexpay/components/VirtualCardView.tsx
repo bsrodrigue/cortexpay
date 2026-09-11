@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Surface, Button, IconButton } from 'react-native-paper';
+import { StyleSheet,View } from 'react-native';
+import { Button, IconButton,Surface, Text } from 'react-native-paper';
+
+import { Theme,useThemedStyles } from '@/modules/shared/theme';
+
 import { VirtualCard } from '../types';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
 
 interface VirtualCardViewProps {
   card: VirtualCard;
@@ -90,7 +92,7 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (_theme: Theme) =>
   StyleSheet.create({
     cardContainer: {
       borderRadius: 16,

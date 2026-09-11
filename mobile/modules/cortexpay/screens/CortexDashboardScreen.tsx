@@ -1,28 +1,30 @@
 import React, { useState } from 'react';
-import { ScrollView, View, StyleSheet, RefreshControl, Alert } from 'react-native';
-import { Text, Surface, Button, Portal, Modal, TextInput, IconButton, Banner } from 'react-native-paper';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
-import { SideMenu } from '@/modules/shared/components/SideMenu';
-import { useAuthStore } from '@/modules/auth/store';
+import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, IconButton, Modal, Portal, Surface, Text, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  useWallets,
-  useUserCards,
-  useDepositMobileMoney,
-  useFXQuote,
-  useConvertCurrency,
-  useIssueCard,
-  useToggleFreezeCard,
-  useSimulateMerchantDebit,
-  useKYCStatus,
-  useSubmitKYC,
-  useSimulateKYCDecision,
-} from '../hooks';
-import { VirtualCardView } from '../components/VirtualCardView';
+
+import { useAuthStore } from '@/modules/auth/store';
+import { SideMenu } from '@/modules/shared/components/SideMenu';
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
+
 import { ConvertModal } from '../components/ConvertModal';
 import { DepositModal } from '../components/DepositModal';
-import { SimulatorPanel } from '../components/SimulatorPanel';
 import { KYCVerificationModal } from '../components/KYCVerificationModal';
+import { SimulatorPanel } from '../components/SimulatorPanel';
+import { VirtualCardView } from '../components/VirtualCardView';
+import {
+  useConvertCurrency,
+  useDepositMobileMoney,
+  useFXQuote,
+  useIssueCard,
+  useKYCStatus,
+  useSimulateKYCDecision,
+  useSimulateMerchantDebit,
+  useSubmitKYC,
+  useToggleFreezeCard,
+  useUserCards,
+  useWallets,
+} from '../hooks';
 
 export const CortexDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -53,17 +55,17 @@ export const CortexDashboardScreen: React.FC = () => {
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
   const [cardholderName, setCardholderName] = useState(
-    user ? `${user.first_name} ${user.last_name || ''}`.trim() : 'Solo Dev Lead'
+    user ? `${user.first_name} ${user.last_name}`.trim() : 'Solo Dev Lead'
   );
   const [initialFunding, setInitialFunding] = useState('25.00');
 
-  const xofWallet = walletsData?.wallets?.XOF;
-  const usdWallet = walletsData?.wallets?.USD;
+  const xofWallet = walletsData?.wallets.XOF;
+  const usdWallet = walletsData?.wallets.USD;
 
   const handleRefresh = () => {
-    refetchWallets();
-    refetchCards();
-    refetchKYC();
+    void refetchWallets();
+    void refetchCards();
+    void refetchKYC();
   };
 
   const handleOpenIssueCard = () => {
@@ -74,22 +76,24 @@ export const CortexDashboardScreen: React.FC = () => {
     setIssueModalVisible(true);
   };
 
-  const handleIssueCardSubmit = async () => {
-    try {
-      await issueCardMutation.mutateAsync({
-        cardholderName,
-        initialFundingUsd: initialFunding,
-      });
-      setIssueModalVisible(false);
-      Alert.alert('Succès', 'Carte virtuelle USD émise et provisionnée avec succès !');
-    } catch (e: any) {
-      if (e?.response?.status === 403) {
+  const handleIssueCardSubmit = () => {
+    void issueCardMutation.mutateAsync({
+      cardholderName,
+      initialFundingUsd: initialFunding,
+    })
+      .then(() => {
         setIssueModalVisible(false);
-        setKycModalVisible(true);
-      } else {
-        Alert.alert('Erreur', e?.response?.data?.detail || e.message);
-      }
-    }
+        Alert.alert('Succès', 'Carte virtuelle USD émise et provisionnée avec succès !');
+      })
+      .catch((e: unknown) => {
+        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+        if (err.response?.status === 403) {
+          setIssueModalVisible(false);
+          setKycModalVisible(true);
+        } else {
+          Alert.alert('Erreur', err.response?.data?.detail || err.message || 'Erreur');
+        }
+      });
   };
 
   const handleDepositSubmit = async (
@@ -106,8 +110,9 @@ export const CortexDashboardScreen: React.FC = () => {
         otp_code: otp,
       });
       Alert.alert('Recharge Réussie', `+${Number(amount).toLocaleString()} XOF crédités via ${operator}.`);
-    } catch (e: any) {
-      Alert.alert('Échec Recharge', e?.response?.data?.detail || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Échec Recharge', err.response?.data?.detail || err.message || 'Erreur');
       throw e;
     }
   };
@@ -116,8 +121,9 @@ export const CortexDashboardScreen: React.FC = () => {
     try {
       await convertMutation.mutateAsync({ quoteId });
       Alert.alert('Succès', 'Conversion effectuée instantanément au taux garanti.');
-    } catch (e: any) {
-      Alert.alert('Échec Conversion', e?.response?.data?.detail || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Échec Conversion', err.response?.data?.detail || err.message || 'Erreur');
       throw e;
     }
   };
@@ -146,8 +152,9 @@ export const CortexDashboardScreen: React.FC = () => {
       } else {
         Alert.alert('Prélèvement Refusé', res.decline_reason || 'Paiement décliné.');
       }
-    } catch (e: any) {
-      Alert.alert('Erreur Simulation', e?.response?.data?.detail || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Erreur Simulation', err.response?.data?.detail || err.message || 'Erreur');
     }
   };
 
@@ -274,7 +281,9 @@ export const CortexDashboardScreen: React.FC = () => {
             <VirtualCardView
               key={c.card_id}
               card={c}
-              onToggleFreeze={(cardId) => freezeMutation.mutate(cardId)}
+              onToggleFreeze={(cardId) => {
+                freezeMutation.mutate(cardId);
+              }}
               isFreezing={freezeMutation.isPending}
             />
           ))
@@ -282,7 +291,7 @@ export const CortexDashboardScreen: React.FC = () => {
           <Surface style={styles.emptyCardContainer} elevation={1}>
             <Text variant="bodyMedium" style={styles.emptyText}>
               {isKYCApproved
-                ? "Vous n'avez pas encore de carte virtuelle USD active."
+                ? 'Vous n\'avez pas encore de carte virtuelle USD active.'
                 : 'Effectuez votre vérification d\'identité pour émettre votre première carte Visa.'}
             </Text>
             <Button

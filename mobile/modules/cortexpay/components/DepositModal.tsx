@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, SegmentedButtons, HelperText } from 'react-native-paper';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
+import { StyleSheet, View } from 'react-native';
+import { Button, Modal, Portal, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
 interface DepositModalProps {
   visible: boolean;
@@ -22,13 +23,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [phone, setPhone] = useState('+221771234567');
   const [otp, setOtp] = useState('123456');
 
-  const handleConfirm = async () => {
-    try {
-      await onDeposit(operator, amount, phone, otp);
-      onDismiss();
-    } catch (e) {
-      console.error(e);
-    }
+  const handleConfirm = () => {
+    void onDeposit(operator, amount, phone, otp)
+      .then(() => {
+        onDismiss();
+      })
+      .catch((e) => {
+        console.error(e);
+      });
   };
 
   const isInvalid = !amount || Number(amount) <= 0 || !phone;

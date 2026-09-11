@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 import { http } from '@/libs/api/client';
 import { validateModel } from '@/libs/api/validation';
 
@@ -14,6 +16,10 @@ import {
   DepositResponseSchema,
   FXQuoteResponse,
   FXQuoteResponseSchema,
+  KYCStatusResponse,
+  KYCStatusResponseSchema,
+  KYCSubmitRequest,
+  KYCSubmitRequestSchema,
   MerchantDebitRequest,
   MerchantDebitRequestSchema,
   MerchantDebitResponse,
@@ -24,13 +30,7 @@ import {
   VirtualCardSchema,
   WalletsResponse,
   WalletsResponseSchema,
-  KYCStatusResponse,
-  KYCStatusResponseSchema,
-  KYCSubmitRequest,
-  KYCSubmitRequestSchema,
 } from './types';
-
-import * as z from 'zod';
 
 export const cortexPayApi = {
   /**

@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import React from 'react';
+
 import { useAuthStore } from '@/modules/auth/store';
 
 export default function ProtectedRootLayout() {

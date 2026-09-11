@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Surface, TextInput, Button, ProgressBar } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Button, ProgressBar, Surface, Text, TextInput } from 'react-native-paper';
+
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
+
 import { FXQuoteResponse } from '../types';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
 
 interface FXQuoteWidgetProps {
   xofBalance: string;
@@ -42,23 +44,25 @@ export const FXQuoteWidget: React.FC<FXQuoteWidgetProps> = ({
     return () => clearInterval(interval);
   }, [activeQuote]);
 
-  const handleFetchQuote = async () => {
-    try {
-      const quote = await onGetQuote(amountXof);
-      setActiveQuote(quote);
-    } catch (e) {
-      console.error(e);
-    }
+  const handleFetchQuote = () => {
+    void onGetQuote(amountXof)
+      .then((quote) => {
+        setActiveQuote(quote);
+      })
+      .catch((e) => {
+        console.error(e);
+      });
   };
 
-  const handleConvert = async () => {
+  const handleConvert = () => {
     if (!activeQuote) return;
-    try {
-      await onExecuteConvert(activeQuote.quote_id);
-      setActiveQuote(null);
-    } catch (e) {
-      console.error(e);
-    }
+    void onExecuteConvert(activeQuote.quote_id)
+      .then(() => {
+        setActiveQuote(null);
+      })
+      .catch((e) => {
+        console.error(e);
+      });
   };
 
   const progress = secondsRemaining / 90;
@@ -66,7 +70,7 @@ export const FXQuoteWidget: React.FC<FXQuoteWidgetProps> = ({
   return (
     <Surface style={styles.container} elevation={2}>
       <Text variant="titleMedium" style={styles.title}>
-        💱 Moteur FX & Quote Locking (TTL 90s)
+        💱 Moteur FX &amp; Quote Locking (TTL 90s)
       </Text>
       <Text variant="bodySmall" style={styles.balanceHint}>
         Solde disponible: {Number(xofBalance).toLocaleString()} XOF

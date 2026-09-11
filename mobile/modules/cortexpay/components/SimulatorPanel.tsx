@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Surface, TextInput, Button, Switch, SegmentedButtons, HelperText } from 'react-native-paper';
-import { useThemedStyles, Theme } from '@/modules/shared/theme';
+import { StyleSheet, View } from 'react-native';
+import { Button, SegmentedButtons, Surface, Switch, Text, TextInput } from 'react-native-paper';
+
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
+
 import { VirtualCard } from '../types';
 
 interface SimulatorPanelProps {
@@ -33,7 +35,18 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   const [debitAmount, setDebitAmount] = useState('20.00');
   const [simulateChaos, setSimulateChaos] = useState(false);
 
-  const selectedCard = cards[0];
+  const hasCards = cards.length > 0;
+  const firstCard = cards[0] as VirtualCard | undefined;
+
+  const handleDeposit = () => {
+    void onSimulateDeposit(operator, depositAmount, phone, otp);
+  };
+
+  const handleDebit = () => {
+    if (firstCard) {
+      void onSimulateDebit(firstCard.card_id, merchant, debitAmount, simulateChaos);
+    }
+  };
 
   return (
     <Surface style={styles.container} elevation={2}>
@@ -60,22 +73,23 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
             value={operator}
             onValueChange={(val) => setOperator(val as 'WAVE' | 'ORANGE_MONEY')}
             buttons={[
-              { value: 'WAVE', label: 'Wave USSD' },
+              { value: 'WAVE', label: 'Wave Sénégal' },
               { value: 'ORANGE_MONEY', label: 'Orange Money' },
             ]}
-            style={styles.operatorButtons}
+            style={styles.segmentedSub}
           />
+
           <TextInput
-            label="Numéro mobile"
+            label="Numéro de téléphone"
             value={phone}
             onChangeText={setPhone}
+            keyboardType="phone-pad"
             mode="outlined"
             style={styles.input}
           />
-          <HelperText type="info">Terminer par 999 pour simuler un rejet USSD utilisateur.</HelperText>
 
           <TextInput
-            label="Montant Recharge (XOF)"
+            label="Montant (XOF)"
             value={depositAmount}
             onChangeText={setDepositAmount}
             keyboardType="numeric"
@@ -84,7 +98,7 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
           />
 
           <TextInput
-            label="Code OTP Déterministe"
+            label="Code OTP Déterministe (Défaut: 123456)"
             value={otp}
             onChangeText={setOtp}
             mode="outlined"
@@ -94,17 +108,17 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
           <Button
             mode="contained"
             buttonColor="#3B82F6"
-            onPress={() => onSimulateDeposit(operator, depositAmount, phone, otp)}
+            onPress={handleDeposit}
             loading={isDepositing}
             disabled={isDepositing}
             style={styles.actionBtn}
           >
-            Déclencher Push USSD & Créditer Wallet
+            Déclencher Push USSD &amp; Créditer Wallet
           </Button>
         </View>
       ) : (
         <View style={styles.tabContent}>
-          {!selectedCard ? (
+          {!hasCards || !firstCard ? (
             <Text style={styles.noCardText}>Veuillez émettre une carte virtuelle avant de simuler un débit.</Text>
           ) : (
             <>
@@ -115,8 +129,9 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
                 mode="outlined"
                 style={styles.input}
               />
+
               <TextInput
-                label="Montant du prélèvement (USD)"
+                label="Montant Débit (USD)"
                 value={debitAmount}
                 onChangeText={setDebitAmount}
                 keyboardType="numeric"
@@ -124,13 +139,13 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
                 style={styles.input}
               />
 
-              <View style={styles.switchRow}>
-                <View style={styles.switchTextContainer}>
-                  <Text variant="bodyMedium" style={styles.switchTitle}>
-                    ⚡ Scénario de Chaos (Coupure Réseau)
+              <View style={styles.chaosRow}>
+                <View style={styles.chaosLabelBox}>
+                  <Text variant="labelLarge" style={styles.chaosTitle}>
+                    ⚡ Simuler Coupure Réseau (Chaos)
                   </Text>
-                  <Text variant="bodySmall" style={styles.switchSub}>
-                    Simule un crash réseau lors du débit et vérifie le rollback automatique du solde.
+                  <Text variant="bodySmall" style={styles.chaosSubtitle}>
+                    Déclenche un crash après débit pour forcer le Rollback de compensation automatique.
                   </Text>
                 </View>
                 <Switch value={simulateChaos} onValueChange={setSimulateChaos} color="#EF4444" />
@@ -139,7 +154,7 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
               <Button
                 mode="contained"
                 buttonColor={simulateChaos ? '#EF4444' : '#10B981'}
-                onPress={() => onSimulateDebit(selectedCard.card_id, merchant, debitAmount, simulateChaos)}
+                onPress={handleDebit}
                 loading={isDebiting}
                 disabled={isDebiting}
                 style={styles.actionBtn}
@@ -160,7 +175,7 @@ const createStyles = (theme: Theme) =>
       padding: 16,
       borderRadius: 16,
       backgroundColor: theme.colors.surface,
-      marginVertical: 10,
+      marginVertical: 14,
     },
     title: {
       fontWeight: 'bold',
@@ -169,46 +184,47 @@ const createStyles = (theme: Theme) =>
     subtitle: {
       color: theme.colors.onSurfaceVariant,
       marginBottom: 12,
+      marginTop: 2,
     },
     segmented: {
-      marginBottom: 14,
+      marginBottom: 12,
+    },
+    segmentedSub: {
+      marginBottom: 12,
     },
     tabContent: {
-      gap: 8,
-    },
-    operatorButtons: {
-      marginBottom: 6,
+      marginTop: 6,
     },
     input: {
-      marginBottom: 4,
-    },
-    switchRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: 10,
-      backgroundColor: '#FEF2F2',
-      borderRadius: 10,
-      marginVertical: 6,
-    },
-    switchTextContainer: {
-      flex: 1,
-      paddingRight: 10,
-    },
-    switchTitle: {
-      fontWeight: 'bold',
-      color: '#991B1B',
-    },
-    switchSub: {
-      color: '#B91C1C',
-      fontSize: 11,
+      marginBottom: 10,
     },
     actionBtn: {
-      marginTop: 8,
+      marginTop: 6,
     },
     noCardText: {
       color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
-      padding: 20,
+      padding: 16,
+    },
+    chaosRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 12,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderRadius: 10,
+      marginVertical: 10,
+    },
+    chaosLabelBox: {
+      flex: 1,
+      marginRight: 10,
+    },
+    chaosTitle: {
+      fontWeight: 'bold',
+      color: '#EF4444',
+    },
+    chaosSubtitle: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 11,
     },
   });
