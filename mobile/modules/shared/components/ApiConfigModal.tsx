@@ -1,3 +1,4 @@
+import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Modal, StyleSheet, View } from 'react-native';
@@ -49,12 +50,26 @@ export function ApiConfigModal({ visible, onDismiss }: ApiConfigModalProps) {
   const handleSave = async (data: { url: string }) => {
     setIsSaving(true);
     try {
-      await AppConfig.setApiUrl(data.url);
-      toast.success('API URL updated', data.url);
-      logger.info(`API URL changed to: ${data.url}`);
+      // Normalize URL: remove trailing slashes
+      const targetUrl = data.url.replace(/\/+$/, '');
+      const pingUrl = `${targetUrl}/ping`;
+
+      logger.info(`Pinging new API endpoint: ${pingUrl}`);
+      // Perform ping check with a 5-second timeout
+      const response = await axios.get(pingUrl, { timeout: 5000 });
+
+      if (response.status !== 200 || response.data?.status !== 'ok') {
+        throw new Error(`Endpoint answered with status ${response.status} instead of 200 OK.`);
+      }
+
+      await AppConfig.setApiUrl(targetUrl);
+      toast.success('API Connectée avec succès', `${targetUrl} (Ping OK)`);
+      logger.info(`API URL validée et mise à jour vers: ${targetUrl}`);
       onDismiss();
     } catch (err) {
-      toast.error('Failed to save URL', err instanceof Error ? err.message : '');
+      const msg = err instanceof Error ? err.message : 'Serveur injoignable';
+      toast.error('Échec de connexion au serveur', `Impossible de joindre /api/ping: ${msg}`);
+      logger.error(`Erreur de ping API: ${String(err)}`);
     } finally {
       setIsSaving(false);
     }

@@ -43,6 +43,16 @@ class MerchantDebitRequestDTO(BaseModel):
     amount_usd: Decimal
     simulate_network_failure: bool = False
 
+# 0. Connectivity Ping
+@router.get("/ping")
+async def ping():
+    return {
+        "status": "ok",
+        "message": "pong",
+        "service": "cortex-pay",
+        "version": "1.0.0"
+    }
+
 # 1. Accounts & Wallets
 @router.get("/wallets/{user_id}")
 async def get_wallets(user_id: str, conn: asyncpg.Connection = Depends(get_db_connection)):

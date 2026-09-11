@@ -20,6 +20,15 @@ async def test_api_health(client):
     assert res.json()["status"] == "healthy"
 
 @pytest.mark.asyncio(loop_scope="function")
+async def test_api_ping(client):
+    res = await client.get("/api/ping")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert data["message"] == "pong"
+    assert data["service"] == "cortex-pay"
+
+@pytest.mark.asyncio(loop_scope="function")
 async def test_fx_quote_locking_and_expiry(client):
     """
     S2 J6-J7: Rejet immédiat du devis de change après 90 secondes.
