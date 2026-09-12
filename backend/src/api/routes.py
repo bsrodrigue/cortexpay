@@ -37,6 +37,22 @@ class CardIssueRequestDTO(BaseModel):
     cardholder_name: str
     initial_funding_usd: Decimal = Decimal("0.0000")
 
+class CardTopupRequestDTO(BaseModel):
+    user_id: str
+    card_id: str
+    amount_usd: Decimal
+
+class CardLimitUpdateRequestDTO(BaseModel):
+    user_id: str
+    card_id: str
+    spending_limit_monthly: Decimal
+
+class WithdrawalRequestDTO(BaseModel):
+    user_id: str
+    phone_number: str
+    operator: str # 'WAVE' or 'ORANGE_MONEY'
+    amount: Decimal
+
 class MerchantDebitRequestDTO(BaseModel):
     card_id: str
     merchant_name: str
@@ -83,6 +99,29 @@ async def deposit_mobile_money(
         async with conn.transaction():
             res = await CortexOrchestrator.deposit_via_mobile_money(conn, req)
             return res
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# 2.b Cash-Out: Withdraw Mobile Money (Wave / Orange Money)
+@router.post("/withdraw/mobile-money")
+async def withdraw_mobile_money(
+    payload: WithdrawalRequestDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await CortexOrchestrator.process_mobile_money_withdrawal(
+                conn=conn,
+                user_id=payload.user_id,
+                phone_number=payload.phone_number,
+                operator=payload.operator,
+                amount_xof=payload.amount
+            )
+            return res
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except OrchestratorError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -180,6 +219,46 @@ async def toggle_freeze_card(card_id: str, conn: asyncpg.Connection = Depends(ge
     new_status = "FROZEN" if card["status"] == "ACTIVE" else "ACTIVE"
     await conn.execute("UPDATE virtual_cards SET status = $1 WHERE card_id = $2", new_status, card_id)
     return {"card_id": card_id, "status": new_status}
+
+@router.post("/cards/topup")
+async def topup_card(
+    payload: CardTopupRequestDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await CortexOrchestrator.topup_virtual_card(
+                conn=conn,
+                user_id=payload.user_id,
+                card_id=payload.card_id,
+                amount_usd=payload.amount_usd
+            )
+            return res
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/cards/spending-limit")
+async def update_card_limit(
+    payload: CardLimitUpdateRequestDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await CortexOrchestrator.update_card_spending_limit(
+                conn=conn,
+                user_id=payload.user_id,
+                card_id=payload.card_id,
+                new_limit_usd=payload.spending_limit_monthly
+            )
+            return res
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 # 6. Merchant Debit Simulation & Chaos Rollback
 @router.post("/cards/simulate-merchant-debit")

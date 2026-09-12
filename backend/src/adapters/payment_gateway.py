@@ -16,13 +16,20 @@ class PaymentGatewayResult(BaseModel):
     provider_tx_id: str
     message: str
 
+class MobileMoneyPayoutRequest(BaseModel):
+    user_id: str
+    phone_number: str
+    operator: str # 'WAVE' or 'ORANGE_MONEY'
+    amount: Decimal
+
 class MockPaymentGateway:
     """
-    Deterministic Mock Adapter for Mobile Money (Wave / Orange Money Push USSD).
+    Deterministic Mock Adapter for Mobile Money (Wave / Orange Money Push USSD & Payouts).
     Allows full local testing without waiting for third-party sandbox / KYC.
     Simulates:
     - USSD push delivery
     - OTP validation (code 123456)
+    - Instant payout disbursement
     - Deterministic network latency
     - Simulated failures if phone ends with 999
     """
@@ -60,3 +67,29 @@ class MockPaymentGateway:
             provider_tx_id=tx_id,
             message=f"Push USSD accepted on {request.operator}."
         )
+
+    @staticmethod
+    async def process_payout(request: MobileMoneyPayoutRequest) -> PaymentGatewayResult:
+        await asyncio.sleep(0.05)
+
+        if request.phone_number.endswith("999"):
+            return PaymentGatewayResult(
+                success=False,
+                provider_tx_id="",
+                message="Payout failed: destination Mobile Money wallet unreachable."
+            )
+
+        if request.amount <= Decimal("0.0000"):
+            return PaymentGatewayResult(
+                success=False,
+                provider_tx_id="",
+                message="Invalid payout amount."
+            )
+
+        tx_id = f"{request.operator[:3]}_PAYOUT_{uuid.uuid4().hex[:12]}"
+        return PaymentGatewayResult(
+            success=True,
+            provider_tx_id=tx_id,
+            message=f"Instant payout disbursed via {request.operator} to {request.phone_number}."
+        )
+

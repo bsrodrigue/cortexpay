@@ -6,6 +6,8 @@ import { validateModel } from '@/libs/api/validation';
 import {
   CardIssueRequest,
   CardIssueRequestSchema,
+  CardLimitUpdateRequest,
+  CardTopupRequest,
   ConvertRequest,
   ConvertRequestSchema,
   ConvertResponse,
@@ -32,6 +34,8 @@ import {
   VirtualCardSchema,
   WalletsResponse,
   WalletsResponseSchema,
+  WithdrawalRequest,
+  WithdrawalRequestSchema,
 } from './types';
 
 export const cortexPayApi = {
@@ -50,6 +54,15 @@ export const cortexPayApi = {
     const validatedInput = DepositRequestSchema.parse(params);
     const response = await http.post<DepositResponse>('/deposit/mobile-money', validatedInput);
     return validateModel(DepositResponseSchema, response, 'Mobile Money Deposit');
+  },
+
+  /**
+   * Cash-Out: Withdraw funds to Wave / Orange Money
+   */
+  async withdrawMobileMoney(params: WithdrawalRequest): Promise<{ provider_tx_id: string; message: string; amount_xof: string; wallet_xof_balance: string }> {
+    const validatedInput = WithdrawalRequestSchema.parse(params);
+    const response = await http.post<{ provider_tx_id: string; message: string; amount_xof: string; wallet_xof_balance: string }>('/withdraw/mobile-money', validatedInput);
+    return response;
   },
 
   /**
@@ -100,6 +113,22 @@ export const cortexPayApi = {
       response,
       'Toggle Freeze Card'
     );
+  },
+
+  /**
+   * Top up virtual card from USD wallet
+   */
+  async topupCard(params: CardTopupRequest): Promise<{ card_id: string; amount_usd: string; card_balance: string; wallet_usd_balance: string }> {
+    const response = await http.post<{ card_id: string; amount_usd: string; card_balance: string; wallet_usd_balance: string }>('/cards/topup', params);
+    return response;
+  },
+
+  /**
+   * Update monthly spending limit on virtual card
+   */
+  async updateCardSpendingLimit(params: CardLimitUpdateRequest): Promise<VirtualCard> {
+    const response = await http.post<VirtualCard>('/cards/spending-limit', params);
+    return validateModel(VirtualCardSchema, response, 'Update Spending Limit');
   },
 
   /**

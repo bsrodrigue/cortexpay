@@ -9,12 +9,14 @@ import { VirtualCard } from '../types';
 interface VirtualCardViewProps {
   card: VirtualCard;
   onToggleFreeze: (cardId: string) => void;
+  onManage?: (card: VirtualCard) => void;
   isFreezing?: boolean;
 }
 
 export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
   card,
   onToggleFreeze,
+  onManage,
   isFreezing = false,
 }) => {
   const [revealed, setRevealed] = useState(false);
@@ -87,6 +89,16 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
         >
           {card.status === 'FROZEN' ? 'Dégeler la carte' : 'Geler 1-Clic'}
         </Button>
+        {onManage && (
+          <Button
+            mode="contained-tonal"
+            icon="cog-outline"
+            onPress={() => onManage(card)}
+            style={styles.manageButton}
+          >
+            Gérer / Recharger
+          </Button>
+        )}
       </View>
     </Surface>
   );
@@ -160,8 +172,17 @@ const createStyles = (_theme: Theme) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: '#475569',
       paddingTop: 10,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 8,
     },
     freezeButton: {
       borderColor: '#94A3B8',
+      flex: 1,
+    },
+    manageButton: {
+      flex: 1,
+      backgroundColor: '#312E81',
     },
   });

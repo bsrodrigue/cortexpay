@@ -9,6 +9,7 @@ import {
   DepositRequest,
   MerchantDebitRequest,
   QuoteRequest,
+  WithdrawalRequest,
 } from './types';
 
 const logger = createLogger('CortexPayHooks');
@@ -60,6 +61,24 @@ export function useDepositMobileMoney() {
     },
     onError: (err) => {
       logger.error('Deposit error:', err);
+    },
+  });
+}
+
+export function useWithdrawMobileMoney() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: Omit<WithdrawalRequest, 'user_id'>) =>
+      cortexPayApi.withdrawMobileMoney({ ...params, user_id: userId }),
+    onSuccess: () => {
+      logger.info('Mobile Money Withdrawal successful. Invalidating wallets and transactions cache.');
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
+    },
+    onError: (err) => {
+      logger.error('Withdrawal error:', err);
     },
   });
 }
@@ -117,6 +136,42 @@ export function useToggleFreezeCard() {
 
   return useMutation({
     mutationFn: (cardId: string) => cortexPayApi.toggleFreezeCard(cardId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+    },
+  });
+}
+
+export function useTopupCard() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: { cardId: string; amountUsd: string }) =>
+      cortexPayApi.topupCard({
+        user_id: userId,
+        card_id: params.cardId,
+        amount_usd: params.amountUsd,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
+    },
+  });
+}
+
+export function useUpdateCardSpendingLimit() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: { cardId: string; spendingLimitMonthly: string }) =>
+      cortexPayApi.updateCardSpendingLimit({
+        user_id: userId,
+        card_id: params.cardId,
+        spending_limit_monthly: params.spendingLimitMonthly,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
     },

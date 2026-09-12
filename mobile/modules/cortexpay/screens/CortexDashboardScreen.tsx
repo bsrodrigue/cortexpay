@@ -7,12 +7,14 @@ import { useAuthStore } from '@/modules/auth/store';
 import { SideMenu } from '@/modules/shared/components/SideMenu';
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
+import { CardDetailsModal } from '../components/CardDetailsModal';
 import { ConvertModal } from '../components/ConvertModal';
 import { DepositModal } from '../components/DepositModal';
 import { KYCVerificationModal } from '../components/KYCVerificationModal';
 import { SimulatorPanel } from '../components/SimulatorPanel';
 import { TransactionHistory } from '../components/TransactionHistory';
 import { VirtualCardView } from '../components/VirtualCardView';
+import { WithdrawModal } from '../components/WithdrawModal';
 import {
   useConvertCurrency,
   useDepositMobileMoney,
@@ -23,10 +25,14 @@ import {
   useSimulateMerchantDebit,
   useSubmitKYC,
   useToggleFreezeCard,
+  useTopupCard,
   useTransactions,
+  useUpdateCardSpendingLimit,
   useUserCards,
   useWallets,
+  useWithdrawMobileMoney,
 } from '../hooks';
+import { VirtualCard } from '../types';
 
 export const CortexDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -46,10 +52,13 @@ export const CortexDashboardScreen: React.FC = () => {
 
   // Mutations
   const depositMutation = useDepositMobileMoney();
+  const withdrawMutation = useWithdrawMobileMoney();
   const fxQuoteMutation = useFXQuote();
   const convertMutation = useConvertCurrency();
   const issueCardMutation = useIssueCard();
   const freezeMutation = useToggleFreezeCard();
+  const topupCardMutation = useTopupCard();
+  const updateLimitMutation = useUpdateCardSpendingLimit();
   const debitMutation = useSimulateMerchantDebit();
   const submitKYCMutation = useSubmitKYC();
   const simulateKYCDecisionMutation = useSimulateKYCDecision();
@@ -58,6 +67,9 @@ export const CortexDashboardScreen: React.FC = () => {
   const [issueModalVisible, setIssueModalVisible] = useState(false);
   const [convertModalVisible, setConvertModalVisible] = useState(false);
   const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [cardDetailsModalVisible, setCardDetailsModalVisible] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<VirtualCard | null>(null);
   const [simulatorModalVisible, setSimulatorModalVisible] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
@@ -122,6 +134,49 @@ export const CortexDashboardScreen: React.FC = () => {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } }; message?: string };
       Alert.alert('Échec Recharge', err.response?.data?.detail || err.message || 'Erreur');
+      throw e;
+    }
+  };
+
+  const handleWithdrawSubmit = async (
+    operator: 'WAVE' | 'ORANGE_MONEY',
+    amount: string,
+    phone: string
+  ) => {
+    try {
+      await withdrawMutation.mutateAsync({
+        operator,
+        amount,
+        phone_number: phone,
+      });
+      Alert.alert('Retrait Confirmé', `${Number(amount).toLocaleString()} XOF transférés vers votre compte ${operator}.`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Échec Retrait', err.response?.data?.detail || err.message || 'Erreur');
+      throw e;
+    }
+  };
+
+  const handleTopupCardSubmit = async (cardId: string, amountUsd: string) => {
+    try {
+      await topupCardMutation.mutateAsync({ cardId, amountUsd });
+      Alert.alert('Carte Rechargée', `+$${Number(amountUsd).toFixed(2)} USD ajoutés à votre carte.`);
+      setCardDetailsModalVisible(false);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Échec Recharge Carte', err.response?.data?.detail || err.message || 'Erreur');
+      throw e;
+    }
+  };
+
+  const handleUpdateLimitSubmit = async (cardId: string, newLimitUsd: string) => {
+    try {
+      await updateLimitMutation.mutateAsync({ cardId, spendingLimitMonthly: newLimitUsd });
+      Alert.alert('Plafond Mis à Jour', `Nouveau plafond mensuel : $${Number(newLimitUsd).toFixed(0)} USD.`);
+      setCardDetailsModalVisible(false);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Échec Modification', err.response?.data?.detail || err.message || 'Erreur');
       throw e;
     }
   };
@@ -273,6 +328,15 @@ export const CortexDashboardScreen: React.FC = () => {
             Convertir
           </Button>
           <Button
+            mode="contained-tonal"
+            icon="arrow-up-bold-circle-outline"
+            onPress={() => setWithdrawModalVisible(true)}
+            style={styles.actionBtn}
+            contentStyle={styles.actionBtnContent}
+          >
+            Retrait
+          </Button>
+          <Button
             mode="outlined"
             icon="credit-card-plus-outline"
             onPress={handleOpenIssueCard}
@@ -297,6 +361,10 @@ export const CortexDashboardScreen: React.FC = () => {
               card={c}
               onToggleFreeze={(cardId) => {
                 freezeMutation.mutate(cardId);
+              }}
+              onManage={(card) => {
+                setSelectedCard(card);
+                setCardDetailsModalVisible(true);
               }}
               isFreezing={freezeMutation.isPending}
             />
@@ -360,6 +428,30 @@ export const CortexDashboardScreen: React.FC = () => {
           onDismiss={() => setDepositModalVisible(false)}
           onDeposit={handleDepositSubmit}
           isDepositing={depositMutation.isPending}
+        />
+
+        {/* Withdraw Modal (Cash-Out) */}
+        <WithdrawModal
+          visible={withdrawModalVisible}
+          onDismiss={() => setWithdrawModalVisible(false)}
+          xofBalance={xofWallet?.balance || '0'}
+          onWithdraw={handleWithdrawSubmit}
+          isWithdrawing={withdrawMutation.isPending}
+        />
+
+        {/* Card Management / Topup / Spending Limit Modal */}
+        <CardDetailsModal
+          visible={cardDetailsModalVisible}
+          onDismiss={() => {
+            setCardDetailsModalVisible(false);
+            setSelectedCard(null);
+          }}
+          card={selectedCard}
+          walletUsdBalance={usdWallet?.balance || '0.00'}
+          onTopup={handleTopupCardSubmit}
+          onUpdateLimit={handleUpdateLimitSubmit}
+          isToppingUp={topupCardMutation.isPending}
+          isUpdatingLimit={updateLimitMutation.isPending}
         />
 
         {/* Sandbox / Simulator Modal */}

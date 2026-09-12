@@ -13,7 +13,11 @@ from backend.src.domain.models import (
 )
 from backend.src.services.ledger import LedgerService, InsufficientFundsError, LedgerError
 from backend.src.services.fx_engine import FXEngineService, FXQuoteExpiredError
-from backend.src.adapters.payment_gateway import MockPaymentGateway, MobileMoneyDepositRequest
+from backend.src.adapters.payment_gateway import (
+    MockPaymentGateway,
+    MobileMoneyDepositRequest,
+    MobileMoneyPayoutRequest
+)
 from backend.src.adapters.card_issuer import MockCardIssuer, CardAuthorizationRequest
 
 class OrchestratorError(Exception):
@@ -461,3 +465,160 @@ class CortexOrchestrator:
             "transaction_id": auth_res.transaction_id,
             "card_balance": card_account_refreshed["balance"]
         }
+
+    @staticmethod
+    async def topup_virtual_card(
+        conn: asyncpg.Connection,
+        user_id: str,
+        card_id: str,
+        amount_usd: Decimal
+    ) -> Dict[str, Any]:
+        """
+        Transfers funds from USER_WALLET_USD to CARD_ACC_{card_id}.
+        Guaranteed by double-entry ledger entry.
+        """
+        if amount_usd <= Decimal("0.0000"):
+            raise OrchestratorError("Amount must be greater than 0.")
+
+        card_row = await conn.fetchrow("SELECT * FROM virtual_cards WHERE card_id = $1 AND user_id = $2", card_id, user_id)
+        if not card_row:
+            raise OrchestratorError(f"Card {card_id} not found for user {user_id}.")
+
+        if card_row["status"] == "TERMINATED":
+            raise OrchestratorError("Cannot top up a terminated card.")
+
+        card_account = await conn.fetchrow("SELECT * FROM accounts WHERE id = $1", card_row["account_id"])
+        user_usd = await CortexOrchestrator.get_or_create_user_wallet(conn, user_id, "USD")
+
+        if user_usd["balance"] < amount_usd:
+            raise InsufficientFundsError(f"Insufficient USD wallet balance ({user_usd['balance']} USD).")
+
+        fund_entry = JournalEntryCreate(
+            idempotency_key=f"TOPUP_{card_id}_{uuid.uuid4().hex[:10]}",
+            reference=card_id,
+            narration=f"Top-up virtual card {card_id} with {amount_usd} USD",
+            postings=[
+                PostingCreate(
+                    account_id=user_usd["id"],
+                    amount=amount_usd,
+                    direction=PostingDirection.DEBIT,
+                    currency="USD",
+                    sequence_no=1
+                ),
+                PostingCreate(
+                    account_id=card_account["id"],
+                    amount=amount_usd,
+                    direction=PostingDirection.CREDIT,
+                    currency="USD",
+                    sequence_no=2
+                )
+            ]
+        )
+        journal = await LedgerService.record_journal_entry(conn, fund_entry)
+        card_account_updated = await conn.fetchrow("SELECT * FROM accounts WHERE id = $1", card_account["id"])
+        user_usd_updated = await conn.fetchrow("SELECT * FROM accounts WHERE id = $1", user_usd["id"])
+
+        return {
+            "journal_entry": journal,
+            "card_id": card_id,
+            "amount_usd": amount_usd,
+            "card_balance": card_account_updated["balance"],
+            "wallet_usd_balance": user_usd_updated["balance"]
+        }
+
+    @staticmethod
+    async def update_card_spending_limit(
+        conn: asyncpg.Connection,
+        user_id: str,
+        card_id: str,
+        new_limit_usd: Decimal
+    ) -> Dict[str, Any]:
+        """
+        Updates the monthly spending limit on a virtual card.
+        """
+        if new_limit_usd <= Decimal("0.0000"):
+            raise OrchestratorError("Spending limit must be greater than 0.")
+
+        card_row = await conn.fetchrow("SELECT * FROM virtual_cards WHERE card_id = $1 AND user_id = $2", card_id, user_id)
+        if not card_row:
+            raise OrchestratorError(f"Card {card_id} not found for user {user_id}.")
+
+        await conn.execute(
+            "UPDATE virtual_cards SET spending_limit_monthly = $1 WHERE card_id = $2",
+            new_limit_usd,
+            card_id
+        )
+
+        updated_card = await conn.fetchrow("SELECT * FROM virtual_cards WHERE card_id = $1", card_id)
+        return dict(updated_card)
+
+    @staticmethod
+    async def process_mobile_money_withdrawal(
+        conn: asyncpg.Connection,
+        user_id: str,
+        phone_number: str,
+        operator: str,
+        amount_xof: Decimal
+    ) -> Dict[str, Any]:
+        """
+        Cash-Out: Withdraws money from user XOF wallet to Mobile Money (Wave / Orange Money).
+        Disburses via MockPaymentGateway and records double-entry ledger entry:
+        DEBIT: USER_WALLET_XOF
+        CREDIT: PAYMENT_PARTNER_{operator}_XOF
+        """
+        if amount_xof <= Decimal("0.0000"):
+            raise OrchestratorError("Withdrawal amount must be greater than 0.")
+
+        if operator not in ["WAVE", "ORANGE_MONEY"]:
+            raise OrchestratorError(f"Unsupported operator: {operator}")
+
+        user_xof = await CortexOrchestrator.get_or_create_user_wallet(conn, user_id, "XOF")
+        if user_xof["balance"] < amount_xof:
+            raise InsufficientFundsError(f"Solde XOF insuffisant ({user_xof['balance']} XOF).")
+
+        partner_account = await CortexOrchestrator.get_or_create_partner_account(conn, operator, "XOF")
+
+        payout_res = await MockPaymentGateway.process_payout(
+            MobileMoneyPayoutRequest(
+                user_id=user_id,
+                phone_number=phone_number,
+                operator=operator,
+                amount=amount_xof
+            )
+        )
+
+        if not payout_res.success:
+            raise OrchestratorError(f"Payout failed: {payout_res.message}")
+
+        withdraw_entry = JournalEntryCreate(
+            idempotency_key=f"WITHDRAW_{payout_res.provider_tx_id}",
+            reference=payout_res.provider_tx_id,
+            narration=f"Mobile Money withdrawal via {operator} to {phone_number}",
+            postings=[
+                PostingCreate(
+                    account_id=user_xof["id"],
+                    amount=amount_xof,
+                    direction=PostingDirection.DEBIT,
+                    currency="XOF",
+                    sequence_no=1
+                ),
+                PostingCreate(
+                    account_id=partner_account["id"],
+                    amount=amount_xof,
+                    direction=PostingDirection.CREDIT,
+                    currency="XOF",
+                    sequence_no=2
+                )
+            ]
+        )
+        journal = await LedgerService.record_journal_entry(conn, withdraw_entry)
+        user_xof_updated = await conn.fetchrow("SELECT * FROM accounts WHERE id = $1", user_xof["id"])
+
+        return {
+            "journal_entry": journal,
+            "provider_tx_id": payout_res.provider_tx_id,
+            "message": payout_res.message,
+            "amount_xof": amount_xof,
+            "wallet_xof_balance": user_xof_updated["balance"]
+        }
+

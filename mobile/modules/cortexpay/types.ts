@@ -113,6 +113,29 @@ export const CardIssueRequestSchema = z.object({
 });
 export type CardIssueRequest = z.infer<typeof CardIssueRequestSchema>;
 
+export const CardTopupRequestSchema = z.object({
+  user_id: z.string(),
+  card_id: z.string(),
+  amount_usd: z.string(),
+});
+export type CardTopupRequest = z.infer<typeof CardTopupRequestSchema>;
+
+export const CardLimitUpdateRequestSchema = z.object({
+  user_id: z.string(),
+  card_id: z.string(),
+  spending_limit_monthly: z.string(),
+});
+export type CardLimitUpdateRequest = z.infer<typeof CardLimitUpdateRequestSchema>;
+
+export const WithdrawalRequestSchema = z.object({
+  user_id: z.string(),
+  phone_number: z.string(),
+  operator: z.enum(['WAVE', 'ORANGE_MONEY']),
+  amount: z.string(),
+});
+export type WithdrawalRequest = z.infer<typeof WithdrawalRequestSchema>;
+
+
 // 5. Merchant Debit Simulation & Chaos
 export const MerchantDebitRequestSchema = z.object({
   card_id: z.string(),

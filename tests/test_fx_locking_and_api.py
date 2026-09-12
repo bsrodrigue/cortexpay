@@ -257,6 +257,61 @@ async def test_kyc_verification_and_card_blocking(client):
         "initial_funding_usd": "0.0000"
     })
     assert card_res.status_code == 200
-    assert "card_id" in card_res.json()
-    assert card_res.json()["status"] == "ACTIVE"
+    card_data = card_res.json()
+    assert "card_id" in card_data
+    assert card_data["status"] == "ACTIVE"
+    card_id = card_data["card_id"]
+
+    # 5.b Fund user wallet (Deposit XOF + Convert to USD)
+    dep_res = await client.post("/api/deposit/mobile-money", json={
+        "user_id": user_id,
+        "phone_number": "+221771234567",
+        "operator": "WAVE",
+        "amount": "100000.00",
+        "otp_code": "123456"
+    })
+    assert dep_res.status_code == 200
+
+    quote_res = await client.post("/api/fx/quote", json={
+        "user_id": user_id,
+        "from_amount_xof": "60000.00"
+    })
+    assert quote_res.status_code == 200
+    quote_id = quote_res.json()["quote_id"]
+
+    conv_res = await client.post("/api/fx/convert", json={
+        "user_id": user_id,
+        "quote_id": quote_id,
+        "idempotency_key": f"IDEM_TEST_{quote_id}"
+    })
+    assert conv_res.status_code == 200
+
+    # 6. Top-up card from USD wallet
+    topup_res = await client.post("/api/cards/topup", json={
+        "user_id": user_id,
+        "card_id": card_id,
+        "amount_usd": "50.00"
+    })
+    assert topup_res.status_code == 200
+    assert Decimal(str(topup_res.json()["card_balance"])) == Decimal("50.0000")
+
+    # 7. Update spending limit
+    limit_res = await client.post("/api/cards/spending-limit", json={
+        "user_id": user_id,
+        "card_id": card_id,
+        "spending_limit_monthly": "2500.00"
+    })
+    assert limit_res.status_code == 200
+    assert Decimal(str(limit_res.json()["spending_limit_monthly"])) == Decimal("2500.0000")
+
+    # 8. Cash-Out / Mobile Money Withdrawal
+    withdraw_res = await client.post("/api/withdraw/mobile-money", json={
+        "user_id": user_id,
+        "phone_number": "+221771234567",
+        "operator": "WAVE",
+        "amount": "10000.00"
+    })
+    assert withdraw_res.status_code == 200
+    assert "provider_tx_id" in withdraw_res.json()
+    assert Decimal(str(withdraw_res.json()["amount_xof"])) == Decimal("10000.00")
 
