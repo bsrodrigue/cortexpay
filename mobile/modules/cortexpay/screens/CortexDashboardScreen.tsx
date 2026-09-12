@@ -11,6 +11,7 @@ import { ConvertModal } from '../components/ConvertModal';
 import { DepositModal } from '../components/DepositModal';
 import { KYCVerificationModal } from '../components/KYCVerificationModal';
 import { SimulatorPanel } from '../components/SimulatorPanel';
+import { TransactionHistory } from '../components/TransactionHistory';
 import { VirtualCardView } from '../components/VirtualCardView';
 import {
   useConvertCurrency,
@@ -22,6 +23,7 @@ import {
   useSimulateMerchantDebit,
   useSubmitKYC,
   useToggleFreezeCard,
+  useTransactions,
   useUserCards,
   useWallets,
 } from '../hooks';
@@ -36,6 +38,11 @@ export const CortexDashboardScreen: React.FC = () => {
   const { data: walletsData, isLoading: isLoadingWallets, refetch: refetchWallets } = useWallets();
   const { data: cards, isLoading: isLoadingCards, refetch: refetchCards } = useUserCards();
   const { kycData, isApproved: isKYCApproved, refetch: refetchKYC } = useKYCStatus();
+  const {
+    data: transactions = [],
+    isLoading: isLoadingTransactions,
+    refetch: refetchTransactions,
+  } = useTransactions(20);
 
   // Mutations
   const depositMutation = useDepositMobileMoney();
@@ -54,6 +61,7 @@ export const CortexDashboardScreen: React.FC = () => {
   const [simulatorModalVisible, setSimulatorModalVisible] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
 
+  const effectiveUserId = user?.user_id || (user?.id ? `usr_${user.id}` : 'usr_cortex_demo');
   const [cardholderName, setCardholderName] = useState(
     user ? `${user.first_name} ${user.last_name}`.trim() : 'Solo Dev Lead'
   );
@@ -66,6 +74,7 @@ export const CortexDashboardScreen: React.FC = () => {
     void refetchWallets();
     void refetchCards();
     void refetchKYC();
+    void refetchTransactions();
   };
 
   const handleOpenIssueCard = () => {
@@ -164,7 +173,12 @@ export const CortexDashboardScreen: React.FC = () => {
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 40 }]}
-        refreshControl={<RefreshControl refreshing={isLoadingWallets || isLoadingCards} onRefresh={handleRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoadingWallets || isLoadingCards || isLoadingTransactions}
+            onRefresh={handleRefresh}
+          />
+        }
       >
         {/* Header & Greeting */}
         <View style={styles.header}>
@@ -304,6 +318,14 @@ export const CortexDashboardScreen: React.FC = () => {
             </Button>
           </Surface>
         )}
+
+        {/* Double-Entry Ledger Transaction Activity */}
+        <TransactionHistory
+          entries={transactions}
+          isLoading={isLoadingTransactions}
+          onRefresh={() => void refetchTransactions()}
+          userId={effectiveUserId}
+        />
 
         {/* KYC Modal */}
         <KYCVerificationModal

@@ -165,3 +165,27 @@ export const KYCSubmitRequestSchema = z.object({
   selfie_url: z.string(),
 });
 export type KYCSubmitRequest = z.infer<typeof KYCSubmitRequestSchema>;
+
+// 7. Ledger Audit Entries Models
+export const LedgerPostingSchema = z.object({
+  id: z.string(),
+  account_id: z.string(),
+  account_number: z.string(),
+  direction: z.enum(['DEBIT', 'CREDIT']),
+  amount: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  currency: z.string(),
+  user_id: z.string().optional(),
+  account_type: z.string().optional(),
+});
+export type LedgerPosting = z.infer<typeof LedgerPostingSchema>;
+
+export const LedgerEntrySchema = z.object({
+  id: z.string(),
+  idempotency_key: z.string(),
+  reference: z.string(),
+  narration: z.string(),
+  status: z.string(),
+  created_at: z.string(),
+  postings: z.array(LedgerPostingSchema),
+});
+export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;

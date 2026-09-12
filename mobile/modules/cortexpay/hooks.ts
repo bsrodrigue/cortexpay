@@ -16,6 +16,7 @@ const logger = createLogger('CortexPayHooks');
 export const CORTEX_QUERY_KEYS = {
   wallets: (userId: string) => ['cortexpay', 'wallets', userId] as const,
   cards: (userId: string) => ['cortexpay', 'cards', userId] as const,
+  transactions: (userId: string) => ['cortexpay', 'transactions', userId] as const,
 };
 
 function useEffectiveUserId(): string {
@@ -55,6 +56,7 @@ export function useDepositMobileMoney() {
     onSuccess: () => {
       logger.info('Mobile Money Deposit successful. Invalidating wallets cache.');
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
     },
     onError: (err) => {
       logger.error('Deposit error:', err);
@@ -85,6 +87,7 @@ export function useConvertCurrency() {
     onSuccess: () => {
       logger.info('FX Conversion successful. Updating wallets.');
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
     },
   });
 }
@@ -103,6 +106,7 @@ export function useIssueCard() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
     },
   });
 }
@@ -128,7 +132,18 @@ export function useSimulateMerchantDebit() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
     },
+  });
+}
+
+export function useTransactions(limit: number = 30) {
+  const userId = useEffectiveUserId();
+  return useQuery({
+    queryKey: CORTEX_QUERY_KEYS.transactions(userId),
+    queryFn: () => cortexPayApi.getLedgerAuditEntries(userId, limit),
+    enabled: !!userId,
+    refetchInterval: 5000,
   });
 }
 

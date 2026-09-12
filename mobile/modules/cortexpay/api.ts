@@ -20,6 +20,8 @@ import {
   KYCStatusResponseSchema,
   KYCSubmitRequest,
   KYCSubmitRequestSchema,
+  LedgerEntry,
+  LedgerEntrySchema,
   MerchantDebitRequest,
   MerchantDebitRequestSchema,
   MerchantDebitResponse,
@@ -144,4 +146,17 @@ export const cortexPayApi = {
     const response = await http.post('/kyc/simulate-decision', params);
     return response;
   },
+
+  /**
+   * Fetch immutable double-entry ledger audit entries (Transactions history)
+   */
+  async getLedgerAuditEntries(userId?: string, limit: number = 30): Promise<LedgerEntry[]> {
+    const params: Record<string, string | number> = { limit };
+    if (userId) {
+      params.user_id = userId;
+    }
+    const response = await http.get<LedgerEntry[]>('/ledger/audit-entries', { params });
+    return validateModel(z.array(LedgerEntrySchema), response, 'Ledger Audit Entries');
+  },
 };
+

@@ -204,23 +204,58 @@ async def simulate_merchant_debit(
 
 # 7. Audit Ledger History
 @router.get("/ledger/audit-entries")
-async def get_ledger_entries(limit: int = 50, conn: asyncpg.Connection = Depends(get_db_connection)):
-    entries_query = """
-        SELECT je.id, je.idempotency_key, je.reference, je.narration, je.status, je.created_at,
-               json_agg(json_build_object(
-                   'id', p.id,
-                   'account_id', p.account_id,
-                   'account_number', a.account_number,
-                   'direction', p.direction,
-                   'amount', p.amount,
-                   'currency', p.currency
-               ) ORDER BY p.sequence_no) as postings
-        FROM journal_entries je
-        JOIN postings p ON je.id = p.entry_id
-        JOIN accounts a ON p.account_id = a.id
-        GROUP BY je.id
-        ORDER BY je.created_at DESC
-        LIMIT $1;
-    """
-    rows = await conn.fetch(entries_query, limit)
+async def get_ledger_entries(
+    user_id: Optional[str] = None,
+    limit: int = 50,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    if user_id:
+        entries_query = """
+            SELECT je.id, je.idempotency_key, je.reference, je.narration, je.status, je.created_at,
+                   json_agg(json_build_object(
+                       'id', p.id,
+                       'account_id', p.account_id,
+                       'account_number', a.account_number,
+                       'direction', p.direction,
+                       'amount', p.amount,
+                       'currency', p.currency,
+                       'user_id', a.user_id,
+                       'account_type', a.type
+                   ) ORDER BY p.sequence_no) as postings
+            FROM journal_entries je
+            JOIN postings p ON je.id = p.entry_id
+            JOIN accounts a ON p.account_id = a.id
+            WHERE je.id IN (
+                SELECT p2.entry_id
+                FROM postings p2
+                JOIN accounts a2 ON p2.account_id = a2.id
+                WHERE a2.user_id = $1
+            )
+            GROUP BY je.id
+            ORDER BY je.created_at DESC
+            LIMIT $2;
+        """
+        rows = await conn.fetch(entries_query, user_id, limit)
+    else:
+        entries_query = """
+            SELECT je.id, je.idempotency_key, je.reference, je.narration, je.status, je.created_at,
+                   json_agg(json_build_object(
+                       'id', p.id,
+                       'account_id', p.account_id,
+                       'account_number', a.account_number,
+                       'direction', p.direction,
+                       'amount', p.amount,
+                       'currency', p.currency,
+                       'user_id', a.user_id,
+                       'account_type', a.type
+                   ) ORDER BY p.sequence_no) as postings
+            FROM journal_entries je
+            JOIN postings p ON je.id = p.entry_id
+            JOIN accounts a ON p.account_id = a.id
+            GROUP BY je.id
+            ORDER BY je.created_at DESC
+            LIMIT $1;
+        """
+        rows = await conn.fetch(entries_query, limit)
     return [dict(r) for r in rows]
+
