@@ -11,6 +11,8 @@ interface TransactionHistoryProps {
   entries: LedgerEntry[];
   isLoading: boolean;
   onRefresh?: () => void;
+  onExportLedger?: () => void;
+  isExporting?: boolean;
   userId: string;
 }
 
@@ -173,17 +175,26 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   entries,
   isLoading,
   onRefresh,
+  onExportLedger,
+  isExporting = false,
   userId,
 }) => {
   const styles = useThemedStyles(createStyles);
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
 
-  if (isLoading && entries.length === 0) {
+  if (isLoading) {
     return (
       <Surface style={styles.card} elevation={1}>
-        <Text variant="bodyMedium" style={styles.emptyText}>
-          Chargement de l&apos;activité comptable...
-        </Text>
+        <View style={styles.headerRow}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Activité Récente
+          </Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Text variant="bodySmall" style={styles.emptyText}>
+            Chargement des écritures du Grand Livre...
+          </Text>
+        </View>
       </Surface>
     );
   }
@@ -191,6 +202,14 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   if (entries.length === 0) {
     return (
       <Surface style={styles.card} elevation={1}>
+        <View style={styles.headerRow}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Activité Récente
+          </Text>
+          {onRefresh && (
+            <IconButton icon="refresh" size={20} onPress={onRefresh} style={styles.refreshBtn} />
+          )}
+        </View>
         <View style={styles.emptyContainer}>
           <IconButton icon="receipt" size={32} iconColor="#94A3B8" />
           <Text variant="titleMedium" style={styles.emptyTitle}>
@@ -211,9 +230,21 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
           <Text variant="titleMedium" style={styles.sectionTitle}>
             Activité Récente ({entries.length})
           </Text>
-          {onRefresh && (
-            <IconButton icon="refresh" size={20} onPress={onRefresh} style={styles.refreshBtn} />
-          )}
+          <View style={styles.headerActions}>
+            {onExportLedger && (
+              <IconButton
+                icon="file-download-outline"
+                size={20}
+                onPress={onExportLedger}
+                loading={isExporting}
+                disabled={isExporting}
+                style={styles.refreshBtn}
+              />
+            )}
+            {onRefresh && (
+              <IconButton icon="refresh" size={20} onPress={onRefresh} style={styles.refreshBtn} />
+            )}
+          </View>
         </View>
 
         <View style={styles.list}>
@@ -284,6 +315,10 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 12,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     sectionTitle: {
       fontWeight: 'bold',

@@ -1,3 +1,5 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, AppStateStatus, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, IconButton, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
@@ -20,6 +22,7 @@ import { WithdrawModal } from '../components/WithdrawModal';
 import {
   useConvertCurrency,
   useDepositMobileMoney,
+  useExportLedgerCsv,
   useFXQuote,
   useInitiate3DSChallenge,
   useIssueCard,
@@ -72,6 +75,7 @@ export const CortexDashboardScreen: React.FC = () => {
   const initiate3DSMutation = useInitiate3DSChallenge();
   const verify3DSMutation = useVerify3DSChallenge();
   const runReconciliationMutation = useRunReconciliation();
+  const exportLedgerMutation = useExportLedgerCsv();
 
   // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
@@ -333,6 +337,31 @@ export const CortexDashboardScreen: React.FC = () => {
     }
   };
 
+  const handleExportLedger = async () => {
+    try {
+      const csvData = await exportLedgerMutation.mutateAsync();
+      const fileName = `cortex_grand_livre_${new Date().toISOString().split('T')[0]}.csv`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, csvData, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Exporter le Grand Livre CortexPay (Audit Trail)',
+          UTI: 'public.comma-separated-values-text',
+        });
+      } else {
+        Alert.alert('Export Réussi', `Fichier sauvegardé localement : ${fileName}`);
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Échec Export', err.response?.data?.detail || err.message || 'Impossible d\'exporter le Grand Livre.');
+    }
+  };
+
   return (
     <View style={[styles.rootWrapper, { paddingTop: insets.top }]}>
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
@@ -503,6 +532,10 @@ export const CortexDashboardScreen: React.FC = () => {
           entries={transactions}
           isLoading={isLoadingTransactions}
           onRefresh={() => void refetchTransactions()}
+          onExportLedger={() => {
+            void handleExportLedger();
+          }}
+          isExporting={exportLedgerMutation.isPending}
           userId={effectiveUserId}
         />
 

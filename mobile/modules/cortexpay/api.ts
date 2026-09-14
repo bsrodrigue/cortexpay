@@ -246,5 +246,30 @@ export const cortexPayApi = {
     const response = await http.post<ReconciliationRunResult>('/reconciliation/run', params);
     return response;
   },
+
+  /**
+   * Export immutable ledger audit trail in CSV format
+   */
+  async exportLedgerCsv(userId?: string): Promise<string> {
+    const params: Record<string, string | number> = { limit: 1000 };
+    if (userId) {
+      params.user_id = userId;
+    }
+    const response = await http.get<string>('/export/ledger/csv', {
+      params,
+      responseType: 'text',
+    });
+    return response;
+  },
+
+  /**
+   * Export partner reconciliation batch and discrepancies in CSV format
+   */
+  async exportReconciliationCsv(batchId: string): Promise<string> {
+    const response = await http.get<string>(`/export/reconciliation/${batchId}/csv`, {
+      responseType: 'text',
+    });
+    return response;
+  },
 };
 

@@ -1,7 +1,7 @@
 from datetime import date
 import json
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, Response, status
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import asyncpg
@@ -13,6 +13,7 @@ from backend.src.services.cortex_orchestrator import CortexOrchestrator, Orchest
 from backend.src.services.ledger import InsufficientFundsError, LedgerError
 from backend.src.services.fx_engine import FXEngineService, FXQuoteExpiredError, FXQuoteNotFoundError
 from backend.src.services.webhook_service import WebhookService, ReconciliationService, WebhookVerificationError
+from backend.src.services.export_service import FinancialExportService
 from backend.src.adapters.payment_gateway import MobileMoneyDepositRequest
 from backend.src.adapters.card_issuer import MockCardIssuer
 
@@ -508,5 +509,45 @@ async def get_reconciliation_batch_details(
         "batch": dict(batch),
         "discrepancies": [dict(i) for i in items]
     }
+
+# 10. Financial Audit Trail & Regulatory Exports (CSV)
+@router.get("/export/ledger/csv")
+async def export_ledger_csv(
+    user_id: Optional[str] = None,
+    limit: int = 1000,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        csv_data = await FinancialExportService.export_ledger_csv(conn, user_id=user_id, limit=limit)
+        filename = f"cortex_ledger_{user_id or 'all'}_{date.today().strftime('%Y%m%d')}.csv"
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/export/reconciliation/{batch_id}/csv")
+async def export_reconciliation_batch_csv(
+    batch_id: str,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        csv_data = await FinancialExportService.export_reconciliation_csv(conn, batch_id=batch_id)
+        filename = f"reconciliation_{batch_id}.csv"
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 

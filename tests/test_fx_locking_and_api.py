@@ -708,6 +708,28 @@ async def test_automated_reconciliation_batch(client):
     assert "AMOUNT_MISMATCH" in reasons
     assert "MISSING_IN_LEDGER" in reasons
 
+    # 4. Verify CSV Export of Reconciliation Batch
+    rec_csv_res = await client.get(f"/api/export/reconciliation/{batch_id}/csv")
+    assert rec_csv_res.status_code == 200
+    assert rec_csv_res.headers["content-type"] == "text/csv; charset=utf-8"
+    assert "attachment; filename=" in rec_csv_res.headers["content-disposition"]
+    rec_csv_text = rec_csv_res.text
+    assert "RECONCILIATION AUDIT REPORT" in rec_csv_text
+    assert batch_id in rec_csv_text
+    assert "AMOUNT_MISMATCH" in rec_csv_text
+
+    # 5. Verify CSV Export of Ledger Audit Trail
+    ledger_csv_res = await client.get("/api/export/ledger/csv")
+    assert ledger_csv_res.status_code == 200
+    assert ledger_csv_res.headers["content-type"] == "text/csv; charset=utf-8"
+    assert "attachment; filename=" in ledger_csv_res.headers["content-disposition"]
+    ledger_csv_text = ledger_csv_res.text
+    assert "Entry ID" in ledger_csv_text
+    assert "Reference" in ledger_csv_text
+    assert "Idempotency Key" in ledger_csv_text
+    assert "Account Number" in ledger_csv_text
+
+
 
 
 

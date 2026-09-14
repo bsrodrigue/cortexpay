@@ -1,3 +1,5 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import React from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Button, Chip, Divider, IconButton, Modal, Portal, Surface, Text } from 'react-native-paper';
@@ -32,14 +34,43 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
     second: '2-digit',
   });
 
-  const handleExportShare = () => {
-    Alert.alert(
-      'Reçu Électronique Officiel',
-      `Reçu CortexPay généré avec succès pour la référence ${entry.reference}.\n\n` +
-      `Date : ${formattedDate}\n` +
-      `Idempotency Key : ${entry.idempotency_key}\n` +
-      `Statut : ${entry.status}`
-    );
+  const handleExportShare = async () => {
+    try {
+      const csvContent = [
+        '--- CORTEX PAY REÇU DE TRANSACTION ---',
+        `Reference: ${entry.reference}`,
+        `Idempotency Key: ${entry.idempotency_key}`,
+        `Date: ${formattedDate}`,
+        `Narration: ${entry.narration}`,
+        `Status: ${entry.status}`,
+        '',
+        '--- ECRITURES DE COMPTABILITE EN PARTIE DOUBLE ---',
+        'Compte,Direction,Montant,Devise,Type',
+        ...entry.postings.map(
+          (p) =>
+            `${p.account_number},${p.direction},${p.amount},${p.currency},${p.account_type || 'ACCOUNT'}`
+        ),
+      ].join('\n');
+
+      const fileName = `recu_cortex_${entry.reference}.csv`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: `Partager le reçu ${entry.reference}`,
+          UTI: 'public.comma-separated-values-text',
+        });
+      } else {
+        Alert.alert('Reçu Généré', `Fichier enregistré localement : ${fileName}`);
+      }
+    } catch (e: unknown) {
+      const err = e as Error;
+      Alert.alert('Erreur Export', err.message || 'Impossible de générer le reçu.');
+    }
   };
 
   return (
@@ -144,12 +175,14 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
           <View style={styles.footer}>
             <Button
               mode="contained"
-              icon="download"
+              icon="file-download-outline"
               buttonColor="#2563EB"
-              onPress={handleExportShare}
+              onPress={() => {
+                void handleExportShare();
+              }}
               style={styles.actionBtn}
             >
-              Télécharger le Reçu PDF / Partager
+              Exporter le Reçu (CSV / Partage)
             </Button>
             <Button mode="text" onPress={onDismiss} style={styles.closeActionBtn}>
               Fermer
