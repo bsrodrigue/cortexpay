@@ -10,5 +10,9 @@ class Settings(BaseSettings):
     MAX_SPREAD_PCT: float = 0.045  # 4.5%
     OTP_MOCK_CODE: str = "123456"
     WEBHOOK_SECRET_KEY: str = os.getenv("WEBHOOK_SECRET_KEY", "cortex_webhook_secret_hmac_2026")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "cortex_jwt_super_secret_signing_key_2026_fintech_production")
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
 settings = Settings()

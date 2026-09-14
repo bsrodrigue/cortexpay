@@ -5,6 +5,7 @@ import { Alert, AppState, AppStateStatus, RefreshControl, ScrollView, StyleSheet
 import { Button, IconButton, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getApiErrorMessage } from '@/libs/api/errors';
 import { BiometricService } from '@/modules/auth/services/biometricService';
 import { useAuthStore } from '@/modules/auth/store';
 import { SideMenu } from '@/modules/shared/components/SideMenu';
@@ -184,8 +185,7 @@ export const CortexDashboardScreen: React.FC = () => {
       setActive3DSChallenge(challenge);
       setThreeDSModalVisible(true);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      Alert.alert('Erreur 3DS', err.response?.data?.detail || err.message || 'Erreur');
+      Alert.alert('Erreur 3DS', getApiErrorMessage(e));
     }
   };
 
@@ -219,8 +219,7 @@ export const CortexDashboardScreen: React.FC = () => {
       });
       Alert.alert('Recharge Réussie', `+${Number(amount).toLocaleString()} XOF crédités via ${operator}.`);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      Alert.alert('Échec Recharge', err.response?.data?.detail || err.message || 'Erreur');
+      Alert.alert('Échec Recharge', getApiErrorMessage(e));
       throw e;
     }
   };
@@ -238,8 +237,7 @@ export const CortexDashboardScreen: React.FC = () => {
       });
       Alert.alert('Retrait Confirmé', `${Number(amount).toLocaleString()} XOF transférés vers votre compte ${operator}.`);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      Alert.alert('Échec Retrait', err.response?.data?.detail || err.message || 'Erreur');
+      Alert.alert('Échec Retrait', getApiErrorMessage(e));
       throw e;
     }
   };
@@ -250,8 +248,7 @@ export const CortexDashboardScreen: React.FC = () => {
       Alert.alert('Carte Rechargée', `+$${Number(amountUsd).toFixed(2)} USD ajoutés à votre carte.`);
       setCardDetailsModalVisible(false);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      Alert.alert('Échec Recharge Carte', err.response?.data?.detail || err.message || 'Erreur');
+      Alert.alert('Échec Recharge Carte', getApiErrorMessage(e));
       throw e;
     }
   };
@@ -404,8 +401,7 @@ export const CortexDashboardScreen: React.FC = () => {
                 );
               })
               .catch((e: unknown) => {
-                const err = e as { response?: { data?: { detail?: string } }; message?: string };
-                Alert.alert('Erreur Litige', err.response?.data?.detail || err.message || 'Erreur');
+                Alert.alert('Erreur Litige', getApiErrorMessage(e));
               });
           },
         },
@@ -426,8 +422,7 @@ export const CortexDashboardScreen: React.FC = () => {
           (decision === 'WON' ? 'Le crédit de remboursement a été inscrit au Grand Livre.' : 'Dossier clos sans remboursement.')
       );
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      Alert.alert('Erreur Arbitrage', err.response?.data?.detail || err.message || 'Échec de l\'arbitrage');
+      Alert.alert('Erreur Arbitrage', getApiErrorMessage(e, 'Échec de l\'arbitrage'));
     }
   };
 

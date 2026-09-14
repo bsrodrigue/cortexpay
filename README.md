@@ -132,6 +132,7 @@ docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/004_kyc
 docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/005_three_d_secure_and_card_labels.sql
 docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/006_webhooks_and_reconciliation.sql
 docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/007_disputes.sql
+docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/008_performance_indexes.sql
 ```
 
 ---

@@ -6,17 +6,24 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.src.core.database import init_db_pool, close_db_pool
 from backend.src.core.redis_client import init_redis, close_redis
+from backend.src.core.logger import setup_logging, get_logger
+from backend.src.core.config import settings
 from backend.src.api.routes import router as api_router
 from backend.src.api.auth_routes import auth_router
 from backend.src.api.kyc_routes import kyc_router
 
+setup_logging("DEBUG" if settings.ENVIRONMENT == "development" else "INFO")
+logger = get_logger("cortex.main")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize Postgres pool & Redis client
+    logger.info("cortex_api_starting_up", environment=settings.ENVIRONMENT)
     await init_db_pool()
     await init_redis()
     yield
     # Shutdown
+    logger.info("cortex_api_shutting_down")
     await close_redis()
     await close_db_pool()
 
