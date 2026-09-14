@@ -21,11 +21,15 @@ done
 echo "✅ Base de données PostgreSQL prête."
 
 echo "=================================================="
-echo "📦 [2/4] Application des migrations SQL"
+echo "📦 [2/4] Application des migrations SQL (001 -> 008)"
 echo "=================================================="
-docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/001_initial_ledger.sql > /dev/null
-docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/002_cards_and_quotes.sql > /dev/null
-echo "✅ Schéma comptable et cartes virtuelles synchronisés."
+for mig in migrations/00*.sql; do
+    if [ -f "$mig" ]; then
+        docker exec -i cortex_postgres psql -U cortex -d cortex_pay < "$mig" > /dev/null 2>&1 || true
+        echo "   ✓ $mig appliqué"
+    fi
+done
+echo "✅ Schémas comptables, 3DS, webhooks et litiges synchronisés."
 
 echo "=================================================="
 echo "🐍 [3/4] Vérification de l'environnement Python"

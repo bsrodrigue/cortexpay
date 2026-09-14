@@ -109,21 +109,47 @@ cortexcard/
 
 ## 4. Guide de Démarrage Rapide
 
-### Prérequis
-- **Docker & Docker Compose**
-- **Python 3.12+** et **uv** (recommandé pour une installation ultra-rapide)
-- **Node.js 20+** et **npm**
+### Installation en 1 commande (Script Idempotent)
+
+Le projet dispose d'un script d'installation complet et **idempotent** qui configure automatiquement l'ensemble des conteneurs, applique les 8 migrations SQL et installe les dépendances Python et React Native :
+
+```bash
+./setup.sh
+```
+
+> **Option tests de conformité** : Pour certifier l'installation immédiatement avec l'ensemble des tests Pytest et Jest, lancez :
+> ```bash
+> ./setup.sh --test
+> ```
 
 ---
 
-### Étape 1 : Démarrer l'infrastructure Docker (Postgres & Redis)
+### Démarrage des Services
+
+1. **Lancer le Backend FastAPI** :
+```bash
+./start.sh
+```
+*L'API est accessible sur `http://localhost:8000`. La documentation Swagger interactive est disponible sur `http://localhost:8000/docs`.*
+
+2. **Lancer l'Application Mobile (Expo)** :
+```bash
+cd mobile
+npm run start
+```
+
+---
+
+### Guide Manuel Alternatif (Étape par étape)
+
+#### Étape 1 : Démarrer l'infrastructure Docker (Postgres & Redis)
 
 Depuis la racine du projet :
 ```bash
 docker compose up -d postgres redis
 ```
 
-Appliquer les migrations SQL (si non montées automatiquement au 1er boot) :
+Appliquer les migrations SQL :
 ```bash
 docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/001_initial_ledger.sql
 docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/002_cards_and_quotes.sql
@@ -137,7 +163,7 @@ docker exec -i cortex_postgres psql -U cortex -d cortex_pay < migrations/008_per
 
 ---
 
-### Étape 2 : Configurer et Lancer le Backend FastAPI
+#### Étape 2 : Configurer et Lancer le Backend FastAPI Manuellement
 
 1. Créer l'environnement virtuel et installer les dépendances :
 ```bash
