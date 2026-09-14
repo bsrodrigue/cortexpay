@@ -28,6 +28,7 @@ import {
   useIssueCard,
   useKYCStatus,
   useOpenDispute,
+  useResolveDispute,
   useRunReconciliation,
   useSimulateKYCDecision,
   useSimulateMerchantDebit,
@@ -37,6 +38,7 @@ import {
   useTransactions,
   useUpdateCardSpendingLimit,
   useUserCards,
+  useUserDisputes,
   useVerify3DSChallenge,
   useWallets,
   useWithdrawMobileMoney,
@@ -60,6 +62,7 @@ export const CortexDashboardScreen: React.FC = () => {
     isLoading: isLoadingTransactions,
     refetch: refetchTransactions,
   } = useTransactions(20);
+  const { data: userDisputes, refetch: refetchDisputes } = useUserDisputes();
 
   // Mutations
   const depositMutation = useDepositMobileMoney();
@@ -78,6 +81,7 @@ export const CortexDashboardScreen: React.FC = () => {
   const runReconciliationMutation = useRunReconciliation();
   const exportLedgerMutation = useExportLedgerCsv();
   const openDisputeMutation = useOpenDispute();
+  const resolveDisputeMutation = useResolveDispute();
 
   // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
@@ -134,6 +138,7 @@ export const CortexDashboardScreen: React.FC = () => {
     void refetchCards();
     void refetchKYC();
     void refetchTransactions();
+    void refetchDisputes();
   };
 
   const handleOpenIssueCard = () => {
@@ -406,6 +411,24 @@ export const CortexDashboardScreen: React.FC = () => {
     );
   };
 
+  const handleResolveDispute = async (disputeId: string, decision: 'WON' | 'LOST') => {
+    try {
+      const res = await resolveDisputeMutation.mutateAsync({
+        disputeId,
+        decision,
+        resolutionNotes: `Arbitrage Visa simulé : ${decision === 'WON' ? 'Favorable au porteur (Chargeback)' : 'Défavorable (Frais maintenus)'}`,
+      });
+      Alert.alert(
+        'Arbitrage Terminé',
+        `Litige ${disputeId} arbitré avec succès.\nNouveau statut : ${res.status}\n` +
+          (decision === 'WON' ? 'Le crédit de remboursement a été inscrit au Grand Livre.' : 'Dossier clos sans remboursement.')
+      );
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Erreur Arbitrage', err.response?.data?.detail || err.message || 'Échec de l\'arbitrage');
+    }
+  };
+
   return (
     <View style={[styles.rootWrapper, { paddingTop: insets.top }]}>
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
@@ -655,14 +678,17 @@ export const CortexDashboardScreen: React.FC = () => {
             </View>
             <SimulatorPanel
               cards={cards || []}
+              disputes={userDisputes || []}
               onSimulateDeposit={handleDepositSubmit}
               onSimulateDebit={handleSimulateDebit}
               onInitiate3DS={handleInitiate3DS}
               onRunReconciliation={handleRunReconciliation}
+              onResolveDispute={handleResolveDispute}
               isDepositing={depositMutation.isPending}
               isDebiting={debitMutation.isPending}
               isInitiating3DS={initiate3DSMutation.isPending}
               isReconciling={runReconciliationMutation.isPending}
+              isResolvingDispute={resolveDisputeMutation.isPending}
             />
           </Modal>
         </Portal>

@@ -4,33 +4,39 @@ import { Button, SegmentedButtons, Surface, Switch, Text, TextInput } from 'reac
 
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
-import { VirtualCard } from '../types';
+import { Dispute, VirtualCard } from '../types';
 
 interface SimulatorPanelProps {
   cards: VirtualCard[];
+  disputes?: Dispute[];
   onSimulateDeposit: (operator: 'WAVE' | 'ORANGE_MONEY', amount: string, phone: string, otp: string) => Promise<void>;
   onSimulateDebit: (cardId: string, merchant: string, amountUsd: string, simulateChaos: boolean) => Promise<void>;
   onInitiate3DS?: (cardId: string, merchant: string, amountUsd: string) => Promise<void>;
   onRunReconciliation?: (provider: 'WAVE' | 'ORANGE_MONEY', withDiscrepancy: boolean) => Promise<void>;
+  onResolveDispute?: (disputeId: string, decision: 'WON' | 'LOST') => Promise<void>;
   isDepositing: boolean;
   isDebiting: boolean;
   isInitiating3DS?: boolean;
   isReconciling?: boolean;
+  isResolvingDispute?: boolean;
 }
 
 export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   cards,
+  disputes = [],
   onSimulateDeposit,
   onSimulateDebit,
   onInitiate3DS,
   onRunReconciliation,
+  onResolveDispute,
   isDepositing,
   isDebiting,
   isInitiating3DS = false,
   isReconciling = false,
+  isResolvingDispute = false,
 }) => {
   const styles = useThemedStyles(createStyles);
-  const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'DEBIT' | 'RECONCILIATION'>('DEPOSIT');
+  const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'DEBIT' | 'RECONCILIATION' | 'DISPUTES'>('DEPOSIT');
 
   // Deposit state
   const [operator, setOperator] = useState<'WAVE' | 'ORANGE_MONEY'>('WAVE');
@@ -77,11 +83,12 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
 
       <SegmentedButtons
         value={activeTab}
-        onValueChange={(val) => setActiveTab(val as 'DEPOSIT' | 'DEBIT' | 'RECONCILIATION')}
+        onValueChange={(val) => setActiveTab(val as 'DEPOSIT' | 'DEBIT' | 'RECONCILIATION' | 'DISPUTES')}
         buttons={[
           { value: 'DEPOSIT', label: 'Push Dépôt' },
-          { value: 'DEBIT', label: 'Débit SaaS' },
-          { value: 'RECONCILIATION', label: 'Audit Rapprochement' },
+          { value: 'DEBIT', label: 'Débit' },
+          { value: 'RECONCILIATION', label: 'Audit' },
+          { value: 'DISPUTES', label: 'Litiges FSM' },
         ]}
         style={styles.segmented}
       />
@@ -250,6 +257,88 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
           </Button>
         </View>
       )}
+
+      {activeTab === 'DISPUTES' && (
+        <View style={styles.tabContent}>
+          <Text variant="bodySmall" style={styles.recExplainer}>
+            Simulez l&apos;arbitrage Visa pour tester les transitions de la Dispute FSM et le crédit de compensation au Grand Livre.
+          </Text>
+
+          {disputes.length === 0 ? (
+            <Text style={styles.noCardText}>
+              Aucun litige ouvert. Pour tester, cliquez sur une transaction de débit dans l&apos;historique puis choisissez &quot;Contester la Transaction&quot;.
+            </Text>
+          ) : (
+            disputes.map((d) => (
+              <View key={d.dispute_id} style={styles.disputeCard}>
+                <View style={styles.disputeHeaderRow}>
+                  <Text variant="labelLarge" style={styles.disputeId}>
+                    {d.dispute_id}
+                  </Text>
+                  <Text
+                    variant="labelSmall"
+                    style={[
+                      styles.disputeStatusBadge,
+                      d.status === 'WON_REFUNDED'
+                        ? styles.badgeWon
+                        : d.status === 'LOST_CLOSED'
+                        ? styles.badgeLost
+                        : styles.badgeReview,
+                    ]}
+                  >
+                    {d.status}
+                  </Text>
+                </View>
+
+                <Text variant="bodySmall" style={styles.disputeDetail}>
+                  Montant : ${Number(d.amount).toFixed(2)} USD • Réf : {d.transaction_reference}
+                </Text>
+
+                {d.status === 'OPENED' || d.status === 'UNDER_REVIEW' ? (
+                  <View style={styles.disputeBtnRow}>
+                    <Button
+                      mode="contained"
+                      buttonColor="#16A34A"
+                      icon="check-decagram"
+                      onPress={() => {
+                        if (onResolveDispute) {
+                          void onResolveDispute(d.dispute_id, 'WON');
+                        }
+                      }}
+                      loading={isResolvingDispute}
+                      disabled={isResolvingDispute}
+                      style={styles.arbitrateBtn}
+                      contentStyle={styles.arbitrateBtnContent}
+                    >
+                      Arbitrer : Gain (Chargeback)
+                    </Button>
+                    <Button
+                      mode="outlined"
+                      textColor="#DC2626"
+                      icon="close-octagon-outline"
+                      onPress={() => {
+                        if (onResolveDispute) {
+                          void onResolveDispute(d.dispute_id, 'LOST');
+                        }
+                      }}
+                      loading={isResolvingDispute}
+                      disabled={isResolvingDispute}
+                      style={styles.arbitrateBtn}
+                      contentStyle={styles.arbitrateBtnContent}
+                    >
+                      Arbitrer : Rejet
+                    </Button>
+                  </View>
+                ) : (
+                  <Text variant="labelSmall" style={styles.terminalNotice}>
+                    ✓ État terminal immuable (Aucune modification autorisée par la FSM)
+                  </Text>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+      )}
     </Surface>
   );
 };
@@ -321,4 +410,35 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.onSurfaceVariant,
       fontSize: 11,
     },
+    disputeCard: {
+      padding: 12,
+      borderRadius: 10,
+      backgroundColor: theme.colors.surfaceVariant,
+      marginBottom: 10,
+    },
+    disputeHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    disputeId: {
+      fontWeight: 'bold',
+      color: theme.colors.onSurface,
+    },
+    disputeStatusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 6,
+      overflow: 'hidden',
+      fontWeight: 'bold',
+    },
+    badgeWon: { backgroundColor: '#DCFCE7', color: '#16A34A' },
+    badgeLost: { backgroundColor: '#FEE2E2', color: '#DC2626' },
+    badgeReview: { backgroundColor: '#FEF3C7', color: '#D97706' },
+    disputeDetail: { color: theme.colors.onSurfaceVariant, marginBottom: 8 },
+    disputeBtnRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    arbitrateBtn: { flex: 1, borderRadius: 8 },
+    arbitrateBtnContent: { height: 36 },
+    terminalNotice: { color: theme.colors.onSurfaceVariant, fontStyle: 'italic', fontSize: 11, marginTop: 4 },
   });
