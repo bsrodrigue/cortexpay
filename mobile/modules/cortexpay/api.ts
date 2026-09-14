@@ -16,6 +16,9 @@ import {
   DepositRequestSchema,
   DepositResponse,
   DepositResponseSchema,
+  Dispute,
+  DisputeOpenRequest,
+  DisputeSchema,
   FXQuoteResponse,
   FXQuoteResponseSchema,
   KYCStatusResponse,
@@ -270,6 +273,44 @@ export const cortexPayApi = {
       responseType: 'text',
     });
     return response;
+  },
+
+  /**
+   * Open a Visa card dispute for an unauthorized or defective charge
+   */
+  async openDispute(params: DisputeOpenRequest): Promise<Dispute> {
+    const response = await http.post<Dispute>('/disputes/open', params);
+    return validateModel(DisputeSchema, response, 'Open Dispute');
+  },
+
+  /**
+   * Submit documentary evidence for an open dispute
+   */
+  async submitDisputeEvidence(disputeId: string, evidenceUrl: string, description?: string): Promise<Dispute> {
+    const response = await http.post<Dispute>(`/disputes/${disputeId}/evidence`, {
+      evidence_url: evidenceUrl,
+      description,
+    });
+    return validateModel(DisputeSchema, response, 'Submit Dispute Evidence');
+  },
+
+  /**
+   * Resolve a dispute (WON/LOST) via FSM
+   */
+  async resolveDispute(disputeId: string, decision: 'WON' | 'LOST', resolutionNotes?: string): Promise<Dispute> {
+    const response = await http.post<Dispute>(`/disputes/${disputeId}/resolve`, {
+      decision,
+      resolution_notes: resolutionNotes,
+    });
+    return validateModel(DisputeSchema, response, 'Resolve Dispute');
+  },
+
+  /**
+   * Fetch all disputes submitted by user
+   */
+  async listUserDisputes(userId: string): Promise<Dispute[]> {
+    const response = await http.get<Dispute[]>(`/disputes/user/${userId}`);
+    return validateModel(z.array(DisputeSchema), response, 'List User Disputes');
   },
 };
 

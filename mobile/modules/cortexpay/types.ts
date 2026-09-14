@@ -302,3 +302,34 @@ export interface ReconciliationRunResult {
   discrepancies: ReconciliationDiscrepancy[];
 }
 
+// 9. Dispute Models (FSM)
+export const DisputeSchema = z.object({
+  id: z.string().optional(),
+  dispute_id: z.string(),
+  transaction_reference: z.string(),
+  card_id: z.string(),
+  user_id: z.string(),
+  amount: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  currency: z.string(),
+  reason: z.string(),
+  description: z.string().nullable().optional(),
+  evidence_url: z.string().nullable().optional(),
+  status: z.enum(['OPENED', 'UNDER_REVIEW', 'WON_REFUNDED', 'LOST_CLOSED']),
+  resolution_notes: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string().optional(),
+});
+export type Dispute = z.infer<typeof DisputeSchema>;
+
+export interface DisputeOpenRequest {
+  user_id: string;
+  transaction_reference: string;
+  card_id: string;
+  amount: string;
+  reason: string;
+  description?: string;
+  evidence_url?: string;
+  currency?: string;
+}
+
+

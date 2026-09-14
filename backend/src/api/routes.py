@@ -14,6 +14,15 @@ from backend.src.services.ledger import InsufficientFundsError, LedgerError
 from backend.src.services.fx_engine import FXEngineService, FXQuoteExpiredError, FXQuoteNotFoundError
 from backend.src.services.webhook_service import WebhookService, ReconciliationService, WebhookVerificationError
 from backend.src.services.export_service import FinancialExportService
+from backend.src.services.dispute_service import DisputeService
+from backend.src.core.state_machine import (
+    CardStateMachine,
+    CardEvent,
+    ThreeDSStateMachine,
+    ThreeDSEvent,
+    DisputeStateMachine,
+    InvalidStateTransitionError,
+)
 from backend.src.adapters.payment_gateway import MobileMoneyDepositRequest
 from backend.src.adapters.card_issuer import MockCardIssuer
 
@@ -85,6 +94,24 @@ class MerchantDebitRequestDTO(BaseModel):
     merchant_name: str
     amount_usd: Decimal
     simulate_network_failure: bool = False
+
+class DisputeOpenDTO(BaseModel):
+    user_id: str
+    transaction_reference: str
+    card_id: str
+    amount: Decimal
+    reason: str
+    description: Optional[str] = None
+    evidence_url: Optional[str] = None
+    currency: str = "USD"
+
+class DisputeEvidenceDTO(BaseModel):
+    evidence_url: str
+    description: Optional[str] = None
+
+class DisputeResolveDTO(BaseModel):
+    decision: str # 'WON' or 'LOST'
+    resolution_notes: Optional[str] = None
 
 # 0. Connectivity Ping
 @router.get("/ping")
@@ -245,9 +272,16 @@ async def toggle_freeze_card(card_id: str, conn: asyncpg.Connection = Depends(ge
     card = await conn.fetchrow("SELECT status FROM virtual_cards WHERE card_id = $1", card_id)
     if not card:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Card not found")
-    new_status = "FROZEN" if card["status"] == "ACTIVE" else "ACTIVE"
-    await conn.execute("UPDATE virtual_cards SET status = $1 WHERE card_id = $2", new_status, card_id)
-    return {"card_id": card_id, "status": new_status}
+    
+    current_status = card["status"]
+    event = CardEvent.FREEZE if current_status == "ACTIVE" else CardEvent.UNFREEZE
+    try:
+        new_status = CardStateMachine.get_next_state(current_status, event)
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    await conn.execute("UPDATE virtual_cards SET status = $1 WHERE card_id = $2", new_status.value, card_id)
+    return {"card_id": card_id, "status": new_status.value}
 
 @router.post("/cards/topup")
 async def topup_card(
@@ -549,5 +583,82 @@ async def export_reconciliation_batch_csv(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# 11. Visa Card Disputes & Chargeback FSM Lifecycle
+@router.post("/disputes/open")
+async def open_dispute(
+    payload: DisputeOpenDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await DisputeService.open_dispute(
+                conn=conn,
+                user_id=payload.user_id,
+                transaction_reference=payload.transaction_reference,
+                card_id=payload.card_id,
+                amount=payload.amount,
+                reason=payload.reason,
+                description=payload.description,
+                evidence_url=payload.evidence_url,
+                currency=payload.currency
+            )
+            return res
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/disputes/{dispute_id}/evidence")
+async def submit_dispute_evidence(
+    dispute_id: str,
+    payload: DisputeEvidenceDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await DisputeService.submit_evidence(
+                conn=conn,
+                dispute_id=dispute_id,
+                evidence_url=payload.evidence_url,
+                description=payload.description
+            )
+            return res
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/disputes/{dispute_id}/resolve")
+async def resolve_dispute(
+    dispute_id: str,
+    payload: DisputeResolveDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await DisputeService.resolve_dispute(
+                conn=conn,
+                dispute_id=dispute_id,
+                decision=payload.decision.upper(),
+                resolution_notes=payload.resolution_notes
+            )
+            return res
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/disputes/user/{user_id}")
+async def list_user_disputes(
+    user_id: str,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    return await DisputeService.list_user_disputes(conn, user_id)
+
 
 

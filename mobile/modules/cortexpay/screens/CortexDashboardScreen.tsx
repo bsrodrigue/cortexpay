@@ -27,6 +27,7 @@ import {
   useInitiate3DSChallenge,
   useIssueCard,
   useKYCStatus,
+  useOpenDispute,
   useRunReconciliation,
   useSimulateKYCDecision,
   useSimulateMerchantDebit,
@@ -40,7 +41,7 @@ import {
   useWallets,
   useWithdrawMobileMoney,
 } from '../hooks';
-import { ThreeDSChallenge, VirtualCard } from '../types';
+import { LedgerEntry, ThreeDSChallenge, VirtualCard } from '../types';
 
 const LOCK_TIMEOUT_MS = 60 * 1000; // 1 minute in background locks app
 
@@ -76,6 +77,7 @@ export const CortexDashboardScreen: React.FC = () => {
   const verify3DSMutation = useVerify3DSChallenge();
   const runReconciliationMutation = useRunReconciliation();
   const exportLedgerMutation = useExportLedgerCsv();
+  const openDisputeMutation = useOpenDispute();
 
   // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
@@ -362,6 +364,48 @@ export const CortexDashboardScreen: React.FC = () => {
     }
   };
 
+  const handleOpenDispute = (entry: LedgerEntry) => {
+    // Extract card debit posting
+    const cardPost = entry.postings.find((p) => p.account_number.startsWith('CARD_ACC_'));
+    const cardId = cardPost ? cardPost.account_number.replace('CARD_ACC_', '') : (cards?.[0]?.card_id || 'card_unknown');
+    const amountUsd = cardPost ? String(cardPost.amount) : '20.00';
+
+    Alert.alert(
+      '🛡️ Litige Visa / Contestation',
+      `Confirmez-vous l'ouverture d'un litige pour le prélèvement de $${amountUsd} USD (Réf: ${entry.reference}) ?\n\n` +
+      `Motif: Débit frauduleux ou marchand non conforme.\n` +
+      `L'état passera à OPENED conformément à la Dispute FSM.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Ouvrir le Litige',
+          style: 'destructive',
+          onPress: () => {
+            void openDisputeMutation
+              .mutateAsync({
+                transactionReference: entry.reference,
+                cardId,
+                amount: amountUsd,
+                reason: 'FRAUD_OR_UNAUTHORIZED_CHARGE',
+                description: `Contestation client pour ${entry.narration}`,
+              })
+              .then((dispute) => {
+                Alert.alert(
+                  '✅ Litige Ouvert (FSM: OPENED)',
+                  `Dossier de contestation n° ${dispute.dispute_id} enregistré avec succès.\n` +
+                  `Statut: OPENED (Sous revue conformité Visa).`
+                );
+              })
+              .catch((e: unknown) => {
+                const err = e as { response?: { data?: { detail?: string } }; message?: string };
+                Alert.alert('Erreur Litige', err.response?.data?.detail || err.message || 'Erreur');
+              });
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.rootWrapper, { paddingTop: insets.top }]}>
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
@@ -535,6 +579,7 @@ export const CortexDashboardScreen: React.FC = () => {
           onExportLedger={() => {
             void handleExportLedger();
           }}
+          onOpenDispute={handleOpenDispute}
           isExporting={exportLedgerMutation.isPending}
           userId={effectiveUserId}
         />

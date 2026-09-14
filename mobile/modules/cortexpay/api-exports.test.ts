@@ -67,4 +67,62 @@ describe('cortexPayApi - Reconciliation & Exports', () => {
     });
     expect(res).toEqual(mockResult);
   });
+
+  it('should call openDispute and validate returned schema', async () => {
+    const mockDispute = {
+      id: 'disp-uuid-1',
+      dispute_id: 'DISP_ABC123',
+      transaction_reference: 'TX_123',
+      card_id: 'card_456',
+      user_id: 'usr_789',
+      amount: '25.0000',
+      currency: 'USD',
+      reason: 'FRAUD_OR_UNAUTHORIZED_CHARGE',
+      description: 'Unauthorized recurring fee',
+      status: 'OPENED',
+      created_at: new Date().toISOString(),
+    };
+    (http.post as jest.Mock).mockResolvedValueOnce(mockDispute);
+
+    const res = await cortexPayApi.openDispute({
+      user_id: 'usr_789',
+      transaction_reference: 'TX_123',
+      card_id: 'card_456',
+      amount: '25.00',
+      reason: 'FRAUD_OR_UNAUTHORIZED_CHARGE',
+      description: 'Unauthorized recurring fee',
+    });
+
+    expect(http.post).toHaveBeenCalledWith('/disputes/open', expect.objectContaining({
+      transaction_reference: 'TX_123',
+      card_id: 'card_456',
+    }));
+    expect(res.status).toBe('OPENED');
+    expect(res.dispute_id).toBe('DISP_ABC123');
+  });
+
+  it('should call resolveDispute and return terminal state', async () => {
+    const mockResolved = {
+      id: 'disp-uuid-1',
+      dispute_id: 'DISP_ABC123',
+      transaction_reference: 'TX_123',
+      card_id: 'card_456',
+      user_id: 'usr_789',
+      amount: '25.0000',
+      currency: 'USD',
+      reason: 'FRAUD_OR_UNAUTHORIZED_CHARGE',
+      status: 'WON_REFUNDED',
+      resolution_notes: 'Chargeback confirmed by merchant bank',
+      created_at: new Date().toISOString(),
+    };
+    (http.post as jest.Mock).mockResolvedValueOnce(mockResolved);
+
+    const res = await cortexPayApi.resolveDispute('DISP_ABC123', 'WON', 'Chargeback confirmed by merchant bank');
+
+    expect(http.post).toHaveBeenCalledWith('/disputes/DISP_ABC123/resolve', {
+      decision: 'WON',
+      resolution_notes: 'Chargeback confirmed by merchant bank',
+    });
+    expect(res.status).toBe('WON_REFUNDED');
+  });
 });

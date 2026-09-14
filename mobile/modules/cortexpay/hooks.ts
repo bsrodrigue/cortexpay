@@ -375,3 +375,58 @@ export function useExportReconciliationCsv() {
   });
 }
 
+export const DISPUTE_QUERY_KEYS = {
+  user: (userId: string) => ['cortexpay', 'disputes', userId] as const,
+};
+
+export function useUserDisputes() {
+  const userId = useEffectiveUserId();
+
+  return useQuery({
+    queryKey: DISPUTE_QUERY_KEYS.user(userId),
+    queryFn: () => cortexPayApi.listUserDisputes(userId),
+    enabled: !!userId,
+  });
+}
+
+export function useOpenDispute() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: {
+      transactionReference: string;
+      cardId: string;
+      amount: string;
+      reason: string;
+      description?: string;
+    }) =>
+      cortexPayApi.openDispute({
+        user_id: userId,
+        transaction_reference: params.transactionReference,
+        card_id: params.cardId,
+        amount: params.amount,
+        reason: params.reason,
+        description: params.description,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: DISPUTE_QUERY_KEYS.user(userId) });
+    },
+  });
+}
+
+export function useResolveDispute() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: { disputeId: string; decision: 'WON' | 'LOST'; resolutionNotes?: string }) =>
+      cortexPayApi.resolveDispute(params.disputeId, params.decision, params.resolutionNotes),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: DISPUTE_QUERY_KEYS.user(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
+    },
+  });
+}
+

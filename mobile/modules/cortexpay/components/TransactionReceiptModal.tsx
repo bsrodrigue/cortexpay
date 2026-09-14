@@ -12,12 +12,14 @@ interface TransactionReceiptModalProps {
   visible: boolean;
   onDismiss: () => void;
   entry: LedgerEntry | null;
+  onOpenDispute?: (entry: LedgerEntry) => void;
 }
 
 export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = ({
   visible,
   onDismiss,
   entry,
+  onOpenDispute,
 }) => {
   const styles = useThemedStyles(createStyles);
 
@@ -184,6 +186,19 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
             >
               Exporter le Reçu (CSV / Partage)
             </Button>
+
+            {onOpenDispute && entry.narration.toLowerCase().includes('card debit') && (
+              <Button
+                mode="outlined"
+                icon="shield-alert-outline"
+                textColor="#DC2626"
+                onPress={() => onOpenDispute(entry)}
+                style={styles.disputeBtn}
+              >
+                Contester la Transaction (Litige Visa)
+              </Button>
+            )}
+
             <Button mode="text" onPress={onDismiss} style={styles.closeActionBtn}>
               Fermer
             </Button>
@@ -320,6 +335,10 @@ const createStyles = (theme: Theme) =>
     },
     actionBtn: {
       borderRadius: 10,
+    },
+    disputeBtn: {
+      borderRadius: 10,
+      borderColor: '#DC2626',
     },
     closeActionBtn: {
       borderRadius: 10,

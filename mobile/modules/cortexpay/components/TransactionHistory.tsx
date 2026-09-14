@@ -12,6 +12,7 @@ interface TransactionHistoryProps {
   isLoading: boolean;
   onRefresh?: () => void;
   onExportLedger?: () => void;
+  onOpenDispute?: (entry: LedgerEntry) => void;
   isExporting?: boolean;
   userId: string;
 }
@@ -176,6 +177,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   isLoading,
   onRefresh,
   onExportLedger,
+  onOpenDispute,
   isExporting = false,
   userId,
 }) => {
@@ -297,6 +299,12 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         visible={!!selectedEntry}
         onDismiss={() => setSelectedEntry(null)}
         entry={selectedEntry}
+        onOpenDispute={(entry) => {
+          setSelectedEntry(null);
+          if (onOpenDispute) {
+            onOpenDispute(entry);
+          }
+        }}
       />
     </>
   );
