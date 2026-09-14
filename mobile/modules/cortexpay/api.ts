@@ -30,6 +30,14 @@ import {
   MerchantDebitResponseSchema,
   QuoteRequest,
   QuoteRequestSchema,
+  ThreeDSChallenge,
+  ThreeDSChallengeSchema,
+  ThreeDSInitiateRequest,
+  ThreeDSInitiateRequestSchema,
+  ThreeDSVerifyRequest,
+  ThreeDSVerifyRequestSchema,
+  ThreeDSVerifyResponse,
+  ThreeDSVerifyResponseSchema,
   VirtualCard,
   VirtualCardSchema,
   WalletsResponse,
@@ -138,6 +146,32 @@ export const cortexPayApi = {
     const validatedInput = MerchantDebitRequestSchema.parse(params);
     const response = await http.post<MerchantDebitResponse>('/cards/simulate-merchant-debit', validatedInput);
     return validateModel(MerchantDebitResponseSchema, response, 'Merchant Debit');
+  },
+
+  /**
+   * Initiate 3D Secure / Push OTP challenge
+   */
+  async initiate3DSChallenge(params: ThreeDSInitiateRequest): Promise<ThreeDSChallenge> {
+    const validatedInput = ThreeDSInitiateRequestSchema.parse(params);
+    const response = await http.post<ThreeDSChallenge>('/cards/3ds/initiate', validatedInput);
+    return validateModel(ThreeDSChallengeSchema, response, '3DS Challenge Initiation');
+  },
+
+  /**
+   * Verify 3DS challenge OTP code and trigger merchant settlement
+   */
+  async verify3DSChallenge(params: ThreeDSVerifyRequest): Promise<ThreeDSVerifyResponse> {
+    const validatedInput = ThreeDSVerifyRequestSchema.parse(params);
+    const response = await http.post<ThreeDSVerifyResponse>('/cards/3ds/verify', validatedInput);
+    return validateModel(ThreeDSVerifyResponseSchema, response, '3DS Challenge Verification');
+  },
+
+  /**
+   * Fetch pending 3DS challenges for a virtual card
+   */
+  async getPending3DSChallenges(cardId: string): Promise<ThreeDSChallenge[]> {
+    const response = await http.get<ThreeDSChallenge[]>(`/cards/3ds/pending/${cardId}`);
+    return validateModel(z.array(ThreeDSChallengeSchema), response, 'Pending 3DS Challenges');
   },
 
   /**

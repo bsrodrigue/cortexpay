@@ -1,10 +1,11 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Chip, IconButton, Surface, Text } from 'react-native-paper';
 
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
 import { LedgerEntry } from '../types';
+import { TransactionReceiptModal } from './TransactionReceiptModal';
 
 interface TransactionHistoryProps {
   entries: LedgerEntry[];
@@ -175,6 +176,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   userId,
 }) => {
   const styles = useThemedStyles(createStyles);
+  const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
 
   if (isLoading && entries.length === 0) {
     return (
@@ -203,55 +205,69 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   }
 
   return (
-    <Surface style={styles.card} elevation={1}>
-      <View style={styles.headerRow}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Activité Récente ({entries.length})
-        </Text>
-        {onRefresh && (
-          <IconButton icon="refresh" size={20} onPress={onRefresh} style={styles.refreshBtn} />
-        )}
-      </View>
+    <>
+      <Surface style={styles.card} elevation={1}>
+        <View style={styles.headerRow}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Activité Récente ({entries.length})
+          </Text>
+          {onRefresh && (
+            <IconButton icon="refresh" size={20} onPress={onRefresh} style={styles.refreshBtn} />
+          )}
+        </View>
 
-      <View style={styles.list}>
-        {entries.map((entry, index) => {
-          const item = parseLedgerEntry(entry, userId);
-          const isLast = index === entries.length - 1;
+        <View style={styles.list}>
+          {entries.map((entry, index) => {
+            const item = parseLedgerEntry(entry, userId);
+            const isLast = index === entries.length - 1;
 
-          return (
-            <View key={item.id} style={[styles.itemRow, !isLast && styles.itemBorder]}>
-              <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-                <IconButton icon={item.icon} iconColor={item.color} size={22} style={styles.itemIcon} />
-              </View>
+            return (
+              <TouchableOpacity
+                key={item.id}
+                activeOpacity={0.7}
+                onPress={() => setSelectedEntry(entry)}
+              >
+                <View style={[styles.itemRow, !isLast && styles.itemBorder]}>
+                  <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
+                    <IconButton icon={item.icon} iconColor={item.color} size={22} style={styles.itemIcon} />
+                  </View>
 
-              <View style={styles.itemInfo}>
-                <Text variant="labelLarge" style={styles.itemTitle}>
-                  {item.title}
-                </Text>
-                <Text variant="bodySmall" style={styles.itemSubtitle}>
-                  {item.subtitle}
-                </Text>
-                <Text variant="labelSmall" style={styles.itemDate}>
-                  {item.date}
-                </Text>
-              </View>
+                  <View style={styles.itemInfo}>
+                    <Text variant="labelLarge" style={styles.itemTitle}>
+                      {item.title}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.itemSubtitle}>
+                      {item.subtitle}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.itemDate}>
+                      {item.date}
+                    </Text>
+                  </View>
 
-              <View style={styles.itemAmountContainer}>
-                <Text
-                  variant="labelLarge"
-                  style={[styles.itemAmount, item.isPositive ? styles.positiveAmount : styles.negativeAmount]}
-                >
-                  {item.amount} {item.currency}
-                </Text>
-                <Chip compact style={styles.statusChip} textStyle={styles.statusChipText}>
-                  {item.status}
-                </Chip>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </Surface>
+                  <View style={styles.itemAmountContainer}>
+                    <Text
+                      variant="labelLarge"
+                      style={[styles.itemAmount, item.isPositive ? styles.positiveAmount : styles.negativeAmount]}
+                    >
+                      {item.amount} {item.currency}
+                    </Text>
+                    <Chip compact style={styles.statusChip} textStyle={styles.statusChipText}>
+                      {item.status}
+                    </Chip>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Surface>
+
+      <TransactionReceiptModal
+        visible={!!selectedEntry}
+        onDismiss={() => setSelectedEntry(null)}
+        entry={selectedEntry}
+      />
+    </>
   );
 };
 

@@ -22,18 +22,33 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
   const [revealed, setRevealed] = useState(false);
   const styles = useThemedStyles(createStyles);
 
+  const isBusiness = card.card_type === 'BUSINESS';
   const displayPan = revealed && card.pan ? card.pan : card.masked_pan;
   const displayCvv = revealed && card.cvv ? card.cvv : '•••';
 
   return (
-    <Surface style={[styles.cardContainer, card.status === 'FROZEN' && styles.frozenCard]} elevation={4}>
+    <Surface
+      style={[
+        styles.cardContainer,
+        isBusiness && styles.businessCard,
+        card.status === 'FROZEN' && styles.frozenCard,
+      ]}
+      elevation={4}
+    >
       <View style={styles.headerRow}>
-        <Text variant="titleMedium" style={styles.cardBrand}>
-          CORTEX PAY
-        </Text>
-        <Text variant="labelLarge" style={styles.cardType}>
-          {card.status === 'FROZEN' ? '❄️ GELÉE' : 'VISA PLATINUM'}
-        </Text>
+        <View>
+          <Text variant="titleMedium" style={styles.cardBrand}>
+            CORTEX PAY
+          </Text>
+          <Text variant="labelSmall" style={styles.cardLabelText}>
+            {card.label || 'Ma Carte Cortex'}
+          </Text>
+        </View>
+        <View style={[styles.badgeContainer, isBusiness ? styles.businessBadge : styles.standardBadge]}>
+          <Text variant="labelSmall" style={styles.badgeText}>
+            {card.status === 'FROZEN' ? '❄️ GELÉE' : isBusiness ? '🏢 BUSINESS VISA' : '✨ STANDARD VISA'}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.chipRow}>
@@ -114,6 +129,11 @@ const createStyles = (_theme: Theme) =>
       minHeight: 210,
       justifyContent: 'space-between',
     },
+    businessCard: {
+      backgroundColor: '#0F172A',
+      borderWidth: 1,
+      borderColor: '#3B82F6',
+    },
     frozenCard: {
       backgroundColor: '#334155',
       opacity: 0.85,
@@ -127,6 +147,28 @@ const createStyles = (_theme: Theme) =>
       color: '#FFFFFF',
       fontWeight: 'bold',
       letterSpacing: 1.5,
+    },
+    cardLabelText: {
+      color: '#94A3B8',
+      marginTop: 2,
+    },
+    badgeContainer: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    standardBadge: {
+      backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    },
+    businessBadge: {
+      backgroundColor: 'rgba(59, 130, 246, 0.25)',
+      borderWidth: 1,
+      borderColor: '#60A5FA',
+    },
+    badgeText: {
+      color: '#93C5FD',
+      fontWeight: '700',
+      fontSize: 10,
     },
     cardType: {
       color: '#93C5FD',

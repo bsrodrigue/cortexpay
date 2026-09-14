@@ -116,15 +116,70 @@ export function useIssueCard() {
   const userId = useEffectiveUserId();
 
   return useMutation({
-    mutationFn: (params: { cardholderName: string; initialFundingUsd: string }) =>
+    mutationFn: (params: {
+      cardholderName: string;
+      initialFundingUsd: string;
+      card_type?: 'STANDARD' | 'BUSINESS';
+      label?: string;
+    }) =>
       cortexPayApi.issueCard({
         user_id: userId,
         cardholder_name: params.cardholderName,
         initial_funding_usd: params.initialFundingUsd,
+        card_type: params.card_type ?? 'STANDARD',
+        label: params.label ?? 'Ma Carte Cortex',
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.wallets(userId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
+    },
+  });
+}
+
+export const THREE_DS_QUERY_KEYS = {
+  pending: (cardId: string) => ['cortexpay', '3ds', 'pending', cardId] as const,
+};
+
+export function usePending3DSChallenges(cardId: string) {
+  return useQuery({
+    queryKey: THREE_DS_QUERY_KEYS.pending(cardId),
+    queryFn: () => cortexPayApi.getPending3DSChallenges(cardId),
+    enabled: !!cardId,
+    refetchInterval: 3000,
+  });
+}
+
+export function useInitiate3DSChallenge() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: { cardId: string; merchantName: string; amountUsd: string }) =>
+      cortexPayApi.initiate3DSChallenge({
+        card_id: params.cardId,
+        merchant_name: params.merchantName,
+        amount_usd: params.amountUsd,
+      }),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: THREE_DS_QUERY_KEYS.pending(data.card_id) });
+    },
+  });
+}
+
+export function useVerify3DSChallenge() {
+  const queryClient = useQueryClient();
+  const userId = useEffectiveUserId();
+
+  return useMutation({
+    mutationFn: (params: { challengeId: string; otpCode: string; cardId: string }) =>
+      cortexPayApi.verify3DSChallenge({
+        challenge_id: params.challengeId,
+        otp_code: params.otpCode,
+      }),
+    onSuccess: (_, variables) => {
+      logger.info('3DS Challenge verified successfully. Updating cards and ledger.');
+      void queryClient.invalidateQueries({ queryKey: THREE_DS_QUERY_KEYS.pending(variables.cardId) });
+      void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.cards(userId) });
       void queryClient.invalidateQueries({ queryKey: CORTEX_QUERY_KEYS.transactions(userId) });
     },
   });

@@ -10,16 +10,20 @@ interface SimulatorPanelProps {
   cards: VirtualCard[];
   onSimulateDeposit: (operator: 'WAVE' | 'ORANGE_MONEY', amount: string, phone: string, otp: string) => Promise<void>;
   onSimulateDebit: (cardId: string, merchant: string, amountUsd: string, simulateChaos: boolean) => Promise<void>;
+  onInitiate3DS?: (cardId: string, merchant: string, amountUsd: string) => Promise<void>;
   isDepositing: boolean;
   isDebiting: boolean;
+  isInitiating3DS?: boolean;
 }
 
 export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   cards,
   onSimulateDeposit,
   onSimulateDebit,
+  onInitiate3DS,
   isDepositing,
   isDebiting,
+  isInitiating3DS = false,
 }) => {
   const styles = useThemedStyles(createStyles);
   const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'DEBIT'>('DEPOSIT');
@@ -45,6 +49,12 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   const handleDebit = () => {
     if (firstCard) {
       void onSimulateDebit(firstCard.card_id, merchant, debitAmount, simulateChaos);
+    }
+  };
+
+  const handle3DS = () => {
+    if (firstCard && onInitiate3DS) {
+      void onInitiate3DS(firstCard.card_id, merchant, debitAmount);
     }
   };
 
@@ -161,6 +171,20 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
               >
                 {simulateChaos ? 'Exécuter Test Chaos & Rollback' : 'Simuler Prélèvement SaaS'}
               </Button>
+
+              {onInitiate3DS && (
+                <Button
+                  mode="outlined"
+                  icon="shield-check"
+                  textColor="#2563EB"
+                  onPress={handle3DS}
+                  loading={isInitiating3DS}
+                  disabled={isInitiating3DS || isDebiting}
+                  style={styles.actionBtn3DS}
+                >
+                  Simuler Challenge 3D Secure (OTP)
+                </Button>
+              )}
             </>
           )}
         </View>
@@ -200,6 +224,10 @@ const createStyles = (theme: Theme) =>
     },
     actionBtn: {
       marginTop: 6,
+    },
+    actionBtn3DS: {
+      marginTop: 8,
+      borderColor: '#2563EB',
     },
     noCardText: {
       color: theme.colors.onSurfaceVariant,

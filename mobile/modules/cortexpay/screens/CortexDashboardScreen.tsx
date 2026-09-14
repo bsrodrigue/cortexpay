@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, IconButton, Modal, Portal, Surface, Text, TextInput } from 'react-native-paper';
+import { Button, IconButton, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/modules/auth/store';
@@ -12,6 +12,7 @@ import { ConvertModal } from '../components/ConvertModal';
 import { DepositModal } from '../components/DepositModal';
 import { KYCVerificationModal } from '../components/KYCVerificationModal';
 import { SimulatorPanel } from '../components/SimulatorPanel';
+import { ThreeDSModal } from '../components/ThreeDSModal';
 import { TransactionHistory } from '../components/TransactionHistory';
 import { VirtualCardView } from '../components/VirtualCardView';
 import { WithdrawModal } from '../components/WithdrawModal';
@@ -19,6 +20,7 @@ import {
   useConvertCurrency,
   useDepositMobileMoney,
   useFXQuote,
+  useInitiate3DSChallenge,
   useIssueCard,
   useKYCStatus,
   useSimulateKYCDecision,
@@ -29,10 +31,11 @@ import {
   useTransactions,
   useUpdateCardSpendingLimit,
   useUserCards,
+  useVerify3DSChallenge,
   useWallets,
   useWithdrawMobileMoney,
 } from '../hooks';
-import { VirtualCard } from '../types';
+import { ThreeDSChallenge, VirtualCard } from '../types';
 
 export const CortexDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -62,6 +65,8 @@ export const CortexDashboardScreen: React.FC = () => {
   const debitMutation = useSimulateMerchantDebit();
   const submitKYCMutation = useSubmitKYC();
   const simulateKYCDecisionMutation = useSimulateKYCDecision();
+  const initiate3DSMutation = useInitiate3DSChallenge();
+  const verify3DSMutation = useVerify3DSChallenge();
 
   // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
@@ -72,12 +77,16 @@ export const CortexDashboardScreen: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<VirtualCard | null>(null);
   const [simulatorModalVisible, setSimulatorModalVisible] = useState(false);
   const [kycModalVisible, setKycModalVisible] = useState(false);
+  const [threeDSModalVisible, setThreeDSModalVisible] = useState(false);
+  const [active3DSChallenge, setActive3DSChallenge] = useState<ThreeDSChallenge | null>(null);
 
   const effectiveUserId = user?.user_id || (user?.id ? `usr_${user.id}` : 'usr_cortex_demo');
   const [cardholderName, setCardholderName] = useState(
     user ? `${user.first_name} ${user.last_name}`.trim() : 'Solo Dev Lead'
   );
   const [initialFunding, setInitialFunding] = useState('25.00');
+  const [cardType, setCardType] = useState<'STANDARD' | 'BUSINESS'>('STANDARD');
+  const [cardLabel, setCardLabel] = useState('Ma Carte Cortex');
 
   const xofWallet = walletsData?.wallets.XOF;
   const usdWallet = walletsData?.wallets.USD;
@@ -101,10 +110,12 @@ export const CortexDashboardScreen: React.FC = () => {
     void issueCardMutation.mutateAsync({
       cardholderName,
       initialFundingUsd: initialFunding,
+      card_type: cardType,
+      label: cardLabel,
     })
       .then(() => {
         setIssueModalVisible(false);
-        Alert.alert('Succès', 'Carte virtuelle USD émise et provisionnée avec succès !');
+        Alert.alert('Succès', `Carte virtuelle ${cardType === 'BUSINESS' ? 'Business ($10k)' : 'Standard ($5k)'} émise et provisionnée avec succès !`);
       })
       .catch((e: unknown) => {
         const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
@@ -115,6 +126,37 @@ export const CortexDashboardScreen: React.FC = () => {
           Alert.alert('Erreur', err.response?.data?.detail || err.message || 'Erreur');
         }
       });
+  };
+
+  const handleInitiate3DS = async (cardId: string, merchant: string, amountUsd: string) => {
+    try {
+      const challenge = await initiate3DSMutation.mutateAsync({
+        cardId,
+        merchantName: merchant,
+        amountUsd,
+      });
+      setSimulatorModalVisible(false);
+      setActive3DSChallenge(challenge);
+      setThreeDSModalVisible(true);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Erreur 3DS', err.response?.data?.detail || err.message || 'Erreur');
+    }
+  };
+
+  const handleVerify3DS = async (challengeId: string, otpCode: string, cardId: string) => {
+    try {
+      await verify3DSMutation.mutateAsync({
+        challengeId,
+        otpCode,
+        cardId,
+      });
+      Alert.alert('🛡️ 3DS Validé', `Paiement marchand de $${Number(active3DSChallenge?.amount || '0').toFixed(2)} USD confirmé avec succès !`);
+      setActive3DSChallenge(null);
+      return;
+    } catch (e: unknown) {
+      throw e;
+    }
   };
 
   const handleDepositSubmit = async (
@@ -468,11 +510,25 @@ export const CortexDashboardScreen: React.FC = () => {
               cards={cards || []}
               onSimulateDeposit={handleDepositSubmit}
               onSimulateDebit={handleSimulateDebit}
+              onInitiate3DS={handleInitiate3DS}
               isDepositing={depositMutation.isPending}
               isDebiting={debitMutation.isPending}
+              isInitiating3DS={initiate3DSMutation.isPending}
             />
           </Modal>
         </Portal>
+
+        {/* 3DS Challenge Verification Modal */}
+        <ThreeDSModal
+          visible={threeDSModalVisible}
+          onDismiss={() => {
+            setThreeDSModalVisible(false);
+            setActive3DSChallenge(null);
+          }}
+          challenge={active3DSChallenge}
+          onVerify={handleVerify3DS}
+          isVerifying={verify3DSMutation.isPending}
+        />
 
         {/* Issue Card Modal */}
         <Portal>
@@ -484,6 +540,28 @@ export const CortexDashboardScreen: React.FC = () => {
             <Text variant="titleLarge" style={styles.modalTitle}>
               Créer une Carte Virtuelle USD
             </Text>
+
+            <Text variant="bodySmall" style={styles.fieldLabel}>
+              Type de Carte &amp; Plafond Mensuel
+            </Text>
+            <SegmentedButtons
+              value={cardType}
+              onValueChange={(val) => setCardType(val as 'STANDARD' | 'BUSINESS')}
+              buttons={[
+                { value: 'STANDARD', label: 'Standard ($5k)' },
+                { value: 'BUSINESS', label: 'Business ($10k)' },
+              ]}
+              style={styles.segmentedType}
+            />
+
+            <TextInput
+              label="Libellé personnalisé (ex: Pubs Meta, SaaS Dev)"
+              value={cardLabel}
+              onChangeText={setCardLabel}
+              mode="outlined"
+              style={styles.modalInput}
+            />
+
             <TextInput
               label="Nom du titulaire"
               value={cardholderName}
@@ -491,6 +569,7 @@ export const CortexDashboardScreen: React.FC = () => {
               mode="outlined"
               style={styles.modalInput}
             />
+
             <TextInput
               label="Provisionnement initial (USD)"
               value={initialFunding}
@@ -499,6 +578,7 @@ export const CortexDashboardScreen: React.FC = () => {
               mode="outlined"
               style={styles.modalInput}
             />
+
             <Button
               mode="contained"
               onPress={handleIssueCardSubmit}
@@ -659,6 +739,14 @@ const createStyles = (theme: Theme) =>
     modalTitle: {
       fontWeight: 'bold',
       marginBottom: 16,
+    },
+    fieldLabel: {
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 6,
+      fontWeight: '600',
+    },
+    segmentedType: {
+      marginBottom: 14,
     },
     modalInput: {
       marginBottom: 12,

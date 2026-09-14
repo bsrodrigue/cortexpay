@@ -46,13 +46,19 @@ class MockCardIssuer:
         return partial + str(check_digit)
 
     @staticmethod
-    def issue_virtual_card(user_id: str, cardholder_name: str) -> Dict[str, Any]:
+    def issue_virtual_card(
+        user_id: str,
+        cardholder_name: str,
+        card_type: str = "STANDARD",
+        label: str = "Ma Carte Cortex"
+    ) -> Dict[str, Any]:
         pan = MockCardIssuer._generate_luhn_pan()
         masked_pan = f"{pan[:4]} •••• •••• {pan[-4:]}"
         cvv = f"{random.randint(100, 999)}"
         expiry_month = random.randint(1, 12)
         expiry_year = 2028 # Valid 2-4 years ahead
         card_id = f"card_{uuid.uuid4().hex[:12]}"
+        default_limit = Decimal("10000.0000") if card_type == "BUSINESS" else Decimal("5000.0000")
 
         return {
             "card_id": card_id,
@@ -63,8 +69,10 @@ class MockCardIssuer:
             "expiry_month": expiry_month,
             "expiry_year": expiry_year,
             "cardholder_name": cardholder_name,
+            "card_type": card_type,
+            "label": label,
             "currency": "USD",
-            "spending_limit_monthly": Decimal("5000.0000"),
+            "spending_limit_monthly": default_limit,
         }
 
     @staticmethod

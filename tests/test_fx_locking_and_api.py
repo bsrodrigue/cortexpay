@@ -315,3 +315,108 @@ async def test_kyc_verification_and_card_blocking(client):
     assert "provider_tx_id" in withdraw_res.json()
     assert Decimal(str(withdraw_res.json()["amount_xof"])) == Decimal("10000.00")
 
+@pytest.mark.asyncio(loop_scope="function")
+async def test_card_categorization_and_3ds_flow(client):
+    """
+    Test Card Categorization (Business vs Standard limits & labels)
+    and 3DS Challenge Flow (Initiate -> OTP Verification -> Merchant Settlement).
+    """
+    unique_email = f"corp_{uuid.uuid4().hex[:8]}@agency.test"
+    reg_res = await client.post("/api/auth/register/", json={
+        "email": unique_email,
+        "password": "SecurePassword123!",
+        "first_name": "Fatou",
+        "last_name": "Sow"
+    })
+    user_id = reg_res.json()["user_id"]
+
+    # Approve KYC Tier 1
+    await client.post("/api/kyc/simulate-decision", json={
+        "user_id": user_id,
+        "decision": "APPROVED",
+        "tier": 1
+    })
+
+    # Issue BUSINESS card
+    card_res = await client.post("/api/cards/issue", json={
+        "user_id": user_id,
+        "cardholder_name": "Fatou Sow Corp",
+        "initial_funding_usd": "0.0000",
+        "card_type": "BUSINESS",
+        "label": "Carte Publicités Meta & Google"
+    })
+    assert card_res.status_code == 200
+    card = card_res.json()
+    assert card["card_type"] == "BUSINESS"
+    assert card["label"] == "Carte Publicités Meta & Google"
+    assert Decimal(str(card["spending_limit_monthly"])) == Decimal("10000.0000")
+    card_id = card["card_id"]
+
+    # Fund card directly via user wallet flow
+    await client.post("/api/deposit/mobile-money", json={
+        "user_id": user_id,
+        "phone_number": "+221778889900",
+        "operator": "WAVE",
+        "amount": "200000.00",
+        "otp_code": "123456"
+    })
+    q_res = await client.post("/api/fx/quote", json={
+        "user_id": user_id,
+        "from_amount_xof": "150000.00"
+    })
+    quote_id = q_res.json()["quote_id"]
+    await client.post("/api/fx/convert", json={
+        "user_id": user_id,
+        "quote_id": quote_id,
+        "idempotency_key": f"IDEM_{quote_id}"
+    })
+    await client.post("/api/cards/topup", json={
+        "user_id": user_id,
+        "card_id": card_id,
+        "amount_usd": "200.00"
+    })
+
+    # 1. Initiate 3DS Challenge (e.g. for Google Ads $150)
+    init_res = await client.post("/api/cards/3ds/initiate", json={
+        "card_id": card_id,
+        "merchant_name": "Google Ads",
+        "amount_usd": "150.00"
+    })
+    assert init_res.status_code == 200
+    challenge = init_res.json()
+    assert challenge["status"] == "PENDING"
+    assert challenge["otp_code"] == "123456"
+    challenge_id = challenge["challenge_id"]
+
+    # 2. Check pending 3ds endpoint
+    pending_res = await client.get(f"/api/cards/3ds/pending/{card_id}")
+    assert pending_res.status_code == 200
+    pending_list = pending_res.json()
+    assert any(c["challenge_id"] == challenge_id for c in pending_list)
+
+    # 3. Verify 3DS with wrong code -> Fails
+    bad_res = await client.post("/api/cards/3ds/verify", json={
+        "challenge_id": challenge_id,
+        "otp_code": "000000"
+    })
+    assert bad_res.status_code == 400
+
+    # 4. Re-initiate and verify with valid OTP '123456' -> Settles debit
+    init2_res = await client.post("/api/cards/3ds/initiate", json={
+        "card_id": card_id,
+        "merchant_name": "Google Ads",
+        "amount_usd": "150.00"
+    })
+    assert init2_res.status_code == 200
+    challenge2_id = init2_res.json()["challenge_id"]
+
+    verify_res = await client.post("/api/cards/3ds/verify", json={
+        "challenge_id": challenge2_id,
+        "otp_code": "123456"
+    })
+    assert verify_res.status_code == 200
+    verify_data = verify_res.json()
+    assert verify_data["status"] == "APPROVED"
+    assert verify_data["debit_result"]["approved"] is True
+
+

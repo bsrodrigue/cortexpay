@@ -36,6 +36,17 @@ class CardIssueRequestDTO(BaseModel):
     user_id: str
     cardholder_name: str
     initial_funding_usd: Decimal = Decimal("0.0000")
+    card_type: str = "STANDARD" # 'STANDARD' or 'BUSINESS'
+    label: str = "Ma Carte Cortex"
+
+class ThreeDSInitiateRequestDTO(BaseModel):
+    card_id: str
+    merchant_name: str
+    amount_usd: Decimal
+
+class ThreeDSVerifyRequestDTO(BaseModel):
+    challenge_id: str
+    otp_code: str
 
 class CardTopupRequestDTO(BaseModel):
     user_id: str
@@ -189,7 +200,9 @@ async def issue_virtual_card(
                 conn=conn,
                 user_id=payload.user_id,
                 cardholder_name=payload.cardholder_name,
-                initial_funding_usd=payload.initial_funding_usd
+                initial_funding_usd=payload.initial_funding_usd,
+                card_type=payload.card_type,
+                label=payload.label
             )
             return card
     except HTTPException:
@@ -280,6 +293,56 @@ async def simulate_merchant_debit(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# 6.b 3D Secure (3DS / Push OTP) Simulation
+@router.post("/cards/3ds/initiate")
+async def initiate_3ds_challenge(
+    payload: ThreeDSInitiateRequestDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await CortexOrchestrator.initiate_3ds_challenge(
+                conn=conn,
+                card_id=payload.card_id,
+                merchant_name=payload.merchant_name,
+                amount_usd=payload.amount_usd
+            )
+            return res
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/cards/3ds/verify")
+async def verify_3ds_challenge(
+    payload: ThreeDSVerifyRequestDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await CortexOrchestrator.verify_3ds_challenge(
+                conn=conn,
+                challenge_id=payload.challenge_id,
+                otp_code=payload.otp_code
+            )
+            return res
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/cards/3ds/pending/{card_id}")
+async def get_pending_3ds_challenges(
+    card_id: str,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        res = await CortexOrchestrator.get_pending_3ds_challenges(conn=conn, card_id=card_id)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 
 # 7. Audit Ledger History
 @router.get("/ledger/audit-entries")

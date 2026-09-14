@@ -102,6 +102,8 @@ export const VirtualCardSchema = z.object({
   balance: z.union([z.string(), z.number()]).transform((val) => String(val)),
   spending_limit_monthly: z.union([z.string(), z.number()]).transform((val) => String(val)),
   current_month_spent: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  card_type: z.enum(['STANDARD', 'BUSINESS']).default('STANDARD'),
+  label: z.string().default('Ma Carte Cortex'),
   created_at: z.string().optional().default(() => new Date().toISOString()),
 });
 export type VirtualCard = z.infer<typeof VirtualCardSchema>;
@@ -110,6 +112,8 @@ export const CardIssueRequestSchema = z.object({
   user_id: z.string(),
   cardholder_name: z.string().min(2),
   initial_funding_usd: z.string().default('0.0000'),
+  card_type: z.enum(['STANDARD', 'BUSINESS']).default('STANDARD'),
+  label: z.string().default('Ma Carte Cortex'),
 });
 export type CardIssueRequest = z.infer<typeof CardIssueRequestSchema>;
 
@@ -153,6 +157,42 @@ export const MerchantDebitResponseSchema = z.object({
   card_balance: z.union([z.string(), z.number()]).transform((val) => String(val)),
 });
 export type MerchantDebitResponse = z.infer<typeof MerchantDebitResponseSchema>;
+
+// 5.b 3D Secure (3DS / Push OTP) Challenge
+export const ThreeDSChallengeSchema = z.object({
+  id: z.string().optional(),
+  challenge_id: z.string(),
+  card_id: z.string(),
+  merchant_name: z.string(),
+  amount: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  currency: z.string().default('USD'),
+  otp_code: z.string(),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'EXPIRED']),
+  expires_at: z.string(),
+  created_at: z.string().optional(),
+});
+export type ThreeDSChallenge = z.infer<typeof ThreeDSChallengeSchema>;
+
+export const ThreeDSInitiateRequestSchema = z.object({
+  card_id: z.string(),
+  merchant_name: z.string(),
+  amount_usd: z.string(),
+});
+export type ThreeDSInitiateRequest = z.infer<typeof ThreeDSInitiateRequestSchema>;
+
+export const ThreeDSVerifyRequestSchema = z.object({
+  challenge_id: z.string(),
+  otp_code: z.string(),
+});
+export type ThreeDSVerifyRequest = z.infer<typeof ThreeDSVerifyRequestSchema>;
+
+export const ThreeDSVerifyResponseSchema = z.object({
+  challenge_id: z.string(),
+  status: z.enum(['APPROVED', 'REJECTED', 'EXPIRED']),
+  debit_result: MerchantDebitResponseSchema,
+});
+export type ThreeDSVerifyResponse = z.infer<typeof ThreeDSVerifyResponseSchema>;
+
 
 // 6. KYC Verification Models
 export const KYCDocumentSchema = z.object({

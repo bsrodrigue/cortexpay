@@ -1,9 +1,10 @@
 from decimal import Decimal
 from uuid import UUID
 import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, List, Optional
 import asyncpg
 import redis.asyncio as aioredis
-from typing import Dict, Any, List
 
 from backend.src.domain.models import (
     PostingDirection,
@@ -220,7 +221,9 @@ class CortexOrchestrator:
         conn: asyncpg.Connection,
         user_id: str,
         cardholder_name: str,
-        initial_funding_usd: Decimal = Decimal("0.0000")
+        initial_funding_usd: Decimal = Decimal("0.0000"),
+        card_type: str = "STANDARD",
+        label: str = "Ma Carte Cortex"
     ) -> Dict[str, Any]:
         """
         Creates a virtual card tied to a dedicated card asset account or user USD wallet.
@@ -228,7 +231,12 @@ class CortexOrchestrator:
         Each card has its own ASSET_WALLET account in USD.
         If initial_funding_usd > 0, transfer from USER_WALLET_USD to CARD_ACCOUNT_USD.
         """
-        card_meta = MockCardIssuer.issue_virtual_card(user_id, cardholder_name)
+        card_meta = MockCardIssuer.issue_virtual_card(
+            user_id=user_id,
+            cardholder_name=cardholder_name,
+            card_type=card_type,
+            label=label
+        )
         card_id = card_meta["card_id"]
 
         # Dedicated card account in USD
@@ -247,9 +255,9 @@ class CortexOrchestrator:
             INSERT INTO virtual_cards (
                 card_id, user_id, account_id, currency, masked_pan, encrypted_pan,
                 expiry_month, expiry_year, cvv, cardholder_name, status,
-                spending_limit_monthly, current_month_spent
+                spending_limit_monthly, current_month_spent, card_type, label
             )
-            VALUES ($1, $2, $3, 'USD', $4, $5, $6, $7, $8, $9, 'ACTIVE', $10, 0.0000)
+            VALUES ($1, $2, $3, 'USD', $4, $5, $6, $7, $8, $9, 'ACTIVE', $10, 0.0000, $11, $12)
             RETURNING created_at, id;
             """,
             card_id,
@@ -261,7 +269,9 @@ class CortexOrchestrator:
             card_meta["expiry_year"],
             card_meta["cvv"],
             card_meta["cardholder_name"],
-            card_meta["spending_limit_monthly"]
+            card_meta["spending_limit_monthly"],
+            card_meta["card_type"],
+            card_meta["label"]
         )
 
         # Funding if requested
@@ -621,4 +631,134 @@ class CortexOrchestrator:
             "amount_xof": amount_xof,
             "wallet_xof_balance": user_xof_updated["balance"]
         }
+
+    @staticmethod
+    async def initiate_3ds_challenge(
+        conn: asyncpg.Connection,
+        card_id: str,
+        merchant_name: str,
+        amount_usd: Decimal
+    ) -> Dict[str, Any]:
+        """
+        Initiates a 3D Secure / Push OTP challenge for a card transaction.
+        Creates a challenge in PENDING state with 5-minute expiry.
+        Default deterministic mock OTP: '123456'.
+        """
+        card = await conn.fetchrow("SELECT * FROM virtual_cards WHERE card_id = $1", card_id)
+        if not card:
+            raise OrchestratorError(f"Card {card_id} not found.")
+        if card["status"] != "ACTIVE":
+            raise OrchestratorError(f"Card {card_id} is {card['status'].lower()}. Cannot initiate 3DS.")
+
+        challenge_id = f"3ds_{uuid.uuid4().hex[:12]}"
+        otp_code = "123456"
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+        row = await conn.fetchrow(
+            """
+            INSERT INTO three_d_secure_challenges (
+                challenge_id, card_id, merchant_name, amount, currency, otp_code, status, expires_at
+            )
+            VALUES ($1, $2, $3, $4, 'USD', $5, 'PENDING', $6)
+            RETURNING id, challenge_id, card_id, merchant_name, amount, currency, otp_code, status, expires_at, created_at;
+            """,
+            challenge_id,
+            card_id,
+            merchant_name,
+            amount_usd,
+            otp_code,
+            expires_at
+        )
+        return dict(row)
+
+    @staticmethod
+    async def verify_3ds_challenge(
+        conn: asyncpg.Connection,
+        challenge_id: str,
+        otp_code: str
+    ) -> Dict[str, Any]:
+        """
+        Verifies 3DS OTP challenge.
+        If valid and not expired, settles the merchant debit onto the ledger and approves challenge.
+        If invalid, marks REJECTED and raises error.
+        """
+        challenge = await conn.fetchrow(
+            "SELECT * FROM three_d_secure_challenges WHERE challenge_id = $1 FOR UPDATE",
+            challenge_id
+        )
+        if not challenge:
+            raise OrchestratorError(f"Challenge 3DS {challenge_id} not found.")
+
+        if challenge["status"] != "PENDING":
+            raise OrchestratorError(f"Challenge already processed with status: {challenge['status']}.")
+
+        now = datetime.now(timezone.utc)
+        if challenge["expires_at"] < now:
+            await conn.execute(
+                "UPDATE three_d_secure_challenges SET status = 'EXPIRED' WHERE challenge_id = $1",
+                challenge_id
+            )
+            raise OrchestratorError("Code 3DS expiré. Veuillez réinitier la transaction.")
+
+        if challenge["otp_code"] != otp_code:
+            await conn.execute(
+                "UPDATE three_d_secure_challenges SET status = 'REJECTED' WHERE challenge_id = $1",
+                challenge_id
+            )
+            raise OrchestratorError("Code OTP 3DS invalide.")
+
+        # OTP is valid -> Execute merchant debit on the ledger
+        debit_result = await CortexOrchestrator.simulate_merchant_debit(
+            conn=conn,
+            card_id=challenge["card_id"],
+            merchant_name=challenge["merchant_name"],
+            amount_usd=Decimal(str(challenge["amount"])),
+            simulate_network_failure_after_debit=False
+        )
+
+        if not debit_result.get("approved"):
+            await conn.execute(
+                "UPDATE three_d_secure_challenges SET status = 'REJECTED' WHERE challenge_id = $1",
+                challenge_id
+            )
+            raise OrchestratorError(f"Échec débit après 3DS : {debit_result.get('decline_reason')}")
+
+        await conn.execute(
+            "UPDATE three_d_secure_challenges SET status = 'APPROVED' WHERE challenge_id = $1",
+            challenge_id
+        )
+
+        return {
+            "challenge_id": challenge_id,
+            "status": "APPROVED",
+            "debit_result": debit_result
+        }
+
+    @staticmethod
+    async def get_pending_3ds_challenges(
+        conn: asyncpg.Connection,
+        card_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns list of pending 3DS challenges, optionally filtered by card_id.
+        """
+        if card_id:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM three_d_secure_challenges
+                WHERE card_id = $1 AND status = 'PENDING' AND expires_at > NOW()
+                ORDER BY created_at DESC;
+                """,
+                card_id
+            )
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM three_d_secure_challenges
+                WHERE status = 'PENDING' AND expires_at > NOW()
+                ORDER BY created_at DESC;
+                """
+            )
+        return [dict(r) for r in rows]
+
 
