@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, AppState, AppStateStatus, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, IconButton, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BiometricService } from '@/modules/auth/services/biometricService';
 import { useAuthStore } from '@/modules/auth/store';
 import { SideMenu } from '@/modules/shared/components/SideMenu';
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
@@ -36,6 +37,8 @@ import {
   useWithdrawMobileMoney,
 } from '../hooks';
 import { ThreeDSChallenge, VirtualCard } from '../types';
+
+const LOCK_TIMEOUT_MS = 60 * 1000; // 1 minute in background locks app
 
 export const CortexDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -90,6 +93,33 @@ export const CortexDashboardScreen: React.FC = () => {
 
   const xofWallet = walletsData?.wallets.XOF;
   const usdWallet = walletsData?.wallets.USD;
+
+  const [isAppLocked, setIsAppLocked] = useState(false);
+  const lastBackgroundTime = useRef<number | null>(null);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background') {
+        lastBackgroundTime.current = Date.now();
+      } else if (nextAppState === 'active') {
+        if (lastBackgroundTime.current && Date.now() - lastBackgroundTime.current > LOCK_TIMEOUT_MS) {
+          setIsAppLocked(true);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleBiometricUnlock = async () => {
+    const success = await BiometricService.authenticate('Déverrouillez CortexPay');
+    if (success) {
+      setIsAppLocked(false);
+      lastBackgroundTime.current = null;
+    }
+  };
 
   const handleRefresh = () => {
     void refetchWallets();
@@ -591,6 +621,32 @@ export const CortexDashboardScreen: React.FC = () => {
           </Modal>
         </Portal>
       </ScrollView>
+
+      {/* Biometric Security Overlay when App is locked */}
+      {isAppLocked && (
+        <Surface style={styles.lockOverlay} elevation={5}>
+          <View style={styles.lockContent}>
+            <View style={styles.lockIconCircle}>
+              <IconButton icon="lock" size={42} iconColor="#2563EB" />
+            </View>
+            <Text variant="headlineSmall" style={styles.lockTitle}>
+              CortexPay Verrouillé
+            </Text>
+            <Text variant="bodyMedium" style={styles.lockSubtitle}>
+              Authentifiez-vous avec votre empreinte digitale ou Face ID pour accéder à vos soldes et cartes.
+            </Text>
+            <Button
+              mode="contained"
+              icon="fingerprint"
+              buttonColor="#2563EB"
+              onPress={() => void handleBiometricUnlock()}
+              style={styles.unlockBtn}
+            >
+              Déverrouiller
+            </Button>
+          </View>
+        </Surface>
+      )}
     </View>
   );
 };
@@ -753,5 +809,44 @@ const createStyles = (theme: Theme) =>
     },
     modalBtn: {
       marginTop: 8,
+    },
+    lockOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 9999,
+      padding: 24,
+    },
+    lockContent: {
+      alignItems: 'center',
+      maxWidth: 320,
+    },
+    lockIconCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: '#EFF6FF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: '#BFDBFE',
+    },
+    lockTitle: {
+      fontWeight: 'bold',
+      color: theme.colors.onSurface,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    lockSubtitle: {
+      color: theme.colors.onSurfaceVariant,
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 20,
+    },
+    unlockBtn: {
+      borderRadius: 12,
+      paddingHorizontal: 16,
     },
   });

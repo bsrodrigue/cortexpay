@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet,View } from 'react-native';
-import { Button, IconButton,Surface, Text } from 'react-native-paper';
+import { StyleSheet, View } from 'react-native';
+import { Button, IconButton, Surface, Text } from 'react-native-paper';
 
-import { Theme,useThemedStyles } from '@/modules/shared/theme';
+import { BiometricService } from '@/modules/auth/services/biometricService';
+import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
 import { VirtualCard } from '../types';
 
@@ -25,6 +26,20 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
   const isBusiness = card.card_type === 'BUSINESS';
   const displayPan = revealed && card.pan ? card.pan : card.masked_pan;
   const displayCvv = revealed && card.cvv ? card.cvv : '•••';
+
+  const handleToggleReveal = async () => {
+    if (!revealed) {
+      // Prompt biometric authentication before revealing sensitive PAN & CVV
+      const success = await BiometricService.authenticate(
+        'Authentifiez-vous pour afficher le numéro complet et le CVV'
+      );
+      if (success) {
+        setRevealed(true);
+      }
+    } else {
+      setRevealed(false);
+    }
+  };
 
   return (
     <Surface
@@ -57,7 +72,7 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
           icon={revealed ? 'eye-off' : 'eye'}
           iconColor="#FFFFFF"
           size={20}
-          onPress={() => setRevealed(!revealed)}
+          onPress={() => void handleToggleReveal()}
         />
       </View>
 

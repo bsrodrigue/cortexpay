@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, HelperText, Modal, Portal, Surface, Text, TextInput } from 'react-native-paper';
 
+import { BiometricService } from '@/modules/auth/services/biometricService';
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
 import { ThreeDSChallenge } from '../types';
@@ -41,6 +42,15 @@ export const ThreeDSModal: React.FC<ThreeDSModalProps> = ({
   const handleConfirm = async () => {
     try {
       setErrorText(null);
+      // Biometric step to confirm authorization
+      const biometricsApproved = await BiometricService.authenticate(
+        `Confirmez le paiement 3D Secure de $${Number(challenge.amount).toFixed(2)} USD chez ${challenge.merchant_name}`
+      );
+      if (!biometricsApproved) {
+        setErrorText('Authentification biométrique annulée ou échouée.');
+        return;
+      }
+
       await onVerify(challenge.challenge_id, otpCode, challenge.card_id);
       onDismiss();
     } catch (e: unknown) {
