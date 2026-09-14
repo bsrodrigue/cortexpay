@@ -14,10 +14,12 @@ import { CardDetailsModal } from '../components/CardDetailsModal';
 import { ConvertModal } from '../components/ConvertModal';
 import { DepositModal } from '../components/DepositModal';
 import { KYCVerificationModal } from '../components/KYCVerificationModal';
+import { NeobankActionRow } from '../components/NeobankActionRow';
+import { NeobankCardView } from '../components/NeobankCardView';
+import { NeobankHeroBalance } from '../components/NeobankHeroBalance';
 import { SimulatorPanel } from '../components/SimulatorPanel';
 import { ThreeDSModal } from '../components/ThreeDSModal';
 import { TransactionHistory } from '../components/TransactionHistory';
-import { VirtualCardView } from '../components/VirtualCardView';
 import { WithdrawModal } from '../components/WithdrawModal';
 import {
   useConvertCurrency,
@@ -493,66 +495,21 @@ export const CortexDashboardScreen: React.FC = () => {
           </Surface>
         )}
 
-        {/* Wallets Overview */}
-        <View style={styles.walletsRow}>
-          <Surface style={styles.walletCard} elevation={2}>
-            <Text variant="labelMedium" style={styles.walletLabel}>
-              PORTEFEUILLE XOF
-            </Text>
-            <Text variant="headlineSmall" style={styles.walletAmount}>
-              {Number(xofWallet?.balance || 0).toLocaleString()} XOF
-            </Text>
-          </Surface>
+        {/* Neobank Hero Balance (Option B: Clean Minimalist) */}
+        <NeobankHeroBalance
+          xofBalance={xofWallet?.balance || '0'}
+          usdBalance={usdWallet?.balance || '0.00'}
+          onRefresh={handleRefresh}
+          isRefreshing={isLoadingWallets || isLoadingCards || isLoadingTransactions}
+        />
 
-          <Surface style={styles.walletCard} elevation={2}>
-            <Text variant="labelMedium" style={styles.walletLabel}>
-              PORTEFEUILLE USD
-            </Text>
-            <Text variant="headlineSmall" style={styles.walletAmountUsd}>
-              ${Number(usdWallet?.balance || 0).toFixed(2)} USD
-            </Text>
-          </Surface>
-        </View>
-
-        {/* Consumer Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <Button
-            mode="contained"
-            icon="plus"
-            onPress={() => setDepositModalVisible(true)}
-            style={styles.actionBtn}
-            contentStyle={styles.actionBtnContent}
-          >
-            Recharger
-          </Button>
-          <Button
-            mode="contained-tonal"
-            icon="swap-horizontal"
-            onPress={() => setConvertModalVisible(true)}
-            style={styles.actionBtn}
-            contentStyle={styles.actionBtnContent}
-          >
-            Convertir
-          </Button>
-          <Button
-            mode="contained-tonal"
-            icon="arrow-up-bold-circle-outline"
-            onPress={() => setWithdrawModalVisible(true)}
-            style={styles.actionBtn}
-            contentStyle={styles.actionBtnContent}
-          >
-            Retrait
-          </Button>
-          <Button
-            mode="outlined"
-            icon="credit-card-plus-outline"
-            onPress={handleOpenIssueCard}
-            style={styles.actionBtn}
-            contentStyle={styles.actionBtnContent}
-          >
-            + Carte
-          </Button>
-        </View>
+        {/* Neobank Circular Quick Actions */}
+        <NeobankActionRow
+          onDeposit={() => setDepositModalVisible(true)}
+          onConvert={() => setConvertModalVisible(true)}
+          onWithdraw={() => setWithdrawModalVisible(true)}
+          onIssueCard={handleOpenIssueCard}
+        />
 
         {/* Cards Section */}
         <View style={styles.sectionHeader}>
@@ -563,7 +520,7 @@ export const CortexDashboardScreen: React.FC = () => {
 
         {cards && cards.length > 0 ? (
           cards.map((c) => (
-            <VirtualCardView
+            <NeobankCardView
               key={c.card_id}
               card={c}
               onToggleFreeze={(cardId) => {
