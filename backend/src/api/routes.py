@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -399,5 +400,12 @@ async def get_ledger_entries(
             LIMIT $1;
         """
         rows = await conn.fetch(entries_query, limit)
-    return [dict(r) for r in rows]
+
+    results = []
+    for r in rows:
+        d = dict(r)
+        if isinstance(d.get("postings"), str):
+            d["postings"] = json.loads(d["postings"])
+        results.append(d)
+    return results
 

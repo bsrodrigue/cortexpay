@@ -2,6 +2,7 @@ import pytest
 from decimal import Decimal
 import uuid
 import asyncio
+import asyncpg
 from httpx import AsyncClient, ASGITransport
 from backend.src.main import app
 from backend.src.core.config import settings
@@ -418,5 +419,129 @@ async def test_card_categorization_and_3ds_flow(client):
     verify_data = verify_res.json()
     assert verify_data["status"] == "APPROVED"
     assert verify_data["debit_result"]["approved"] is True
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_3ds_challenge_expiry_and_security_policy(client):
+    """
+    Scénarios de sécurité 3DS et contrôle des politiques de risque :
+    1. Expiration temporelle d'un challenge 3DS (TTL expiré -> 400 Bad Request).
+    2. Blocage des catégories marchandes à risque (CASINO, BETTING, DARKNET).
+    3. Dépassement du plafond mensuel de la carte lors d'un débit 3DS.
+    4. Audit trail et validation de l'écriture en partie double (double-entry receipt).
+    """
+    user_email = f"sec_user_{uuid.uuid4().hex[:8]}@cortexcard.test"
+    reg = await client.post("/api/auth/register/", json={
+        "email": user_email,
+        "password": "SecurePassword123!",
+        "first_name": "Awa",
+        "last_name": "Ndiaye"
+    })
+    user_id = reg.json()["user_id"]
+
+    await client.post("/api/kyc/simulate-decision", json={"user_id": user_id, "decision": "APPROVED", "tier": 1})
+
+    # Issue Standard Card with initial limit $5,000
+    card_res = await client.post("/api/cards/issue", json={
+        "user_id": user_id,
+        "cardholder_name": "Awa Ndiaye",
+        "initial_funding_usd": "0.0000",
+        "card_type": "STANDARD",
+        "label": "Carte Principale"
+    })
+    card = card_res.json()
+    card_id = card["card_id"]
+
+    # Provision $300 USD
+    await client.post("/api/deposit/mobile-money", json={
+        "user_id": user_id,
+        "phone_number": "+221773334455",
+        "operator": "WAVE",
+        "amount": "250000.00",
+        "otp_code": "123456"
+    })
+    q = await client.post("/api/fx/quote", json={"user_id": user_id, "from_amount_xof": "200000.00"})
+    quote_id = q.json()["quote_id"]
+    await client.post("/api/fx/convert", json={"user_id": user_id, "quote_id": quote_id, "idempotency_key": f"IDEM_{quote_id}"})
+    await client.post("/api/cards/topup", json={"user_id": user_id, "card_id": card_id, "amount_usd": "300.00"})
+
+    # 1. 3DS Expiry Scenario: initiate challenge, then artificially expire it in DB
+    init_res = await client.post("/api/cards/3ds/initiate", json={
+        "card_id": card_id,
+        "merchant_name": "Spotify Premium",
+        "amount_usd": "10.00"
+    })
+    assert init_res.status_code == 200
+    challenge_id = init_res.json()["challenge_id"]
+
+    # Manually expire the challenge timestamp
+    conn = await asyncpg.connect(settings.DATABASE_URL)
+    await conn.execute(
+        "UPDATE three_d_secure_challenges SET expires_at = NOW() - INTERVAL '10 seconds' WHERE challenge_id = $1",
+        challenge_id
+    )
+    await conn.close()
+
+    # Attempt verify expired challenge -> Must return 400 Bad Request
+    expired_res = await client.post("/api/cards/3ds/verify", json={
+        "challenge_id": challenge_id,
+        "otp_code": "123456"
+    })
+    assert expired_res.status_code == 400
+    assert "expiré" in expired_res.json()["detail"].lower()
+
+    # 2. Blocked Category (Policy Enforcement): CASINO / BETTING
+    blocked_init = await client.post("/api/cards/3ds/initiate", json={
+        "card_id": card_id,
+        "merchant_name": "CASINO ONLINE",
+        "amount_usd": "50.00"
+    })
+    assert blocked_init.status_code == 200
+    blocked_cid = blocked_init.json()["challenge_id"]
+
+    blocked_verify = await client.post("/api/cards/3ds/verify", json={
+        "challenge_id": blocked_cid,
+        "otp_code": "123456"
+    })
+    assert blocked_verify.status_code == 400
+    assert "security policy" in blocked_verify.json()["detail"].lower()
+
+    # 3. Monthly Spending Limit Exceeded via 3DS
+    # Set limit very low ($20)
+    await client.post("/api/cards/spending-limit", json={
+        "user_id": user_id,
+        "card_id": card_id,
+        "spending_limit_monthly": "20.00"
+    })
+
+    limit_init = await client.post("/api/cards/3ds/initiate", json={
+        "card_id": card_id,
+        "merchant_name": "Figma",
+        "amount_usd": "25.00"
+    })
+    assert limit_init.status_code == 200
+    limit_cid = limit_init.json()["challenge_id"]
+
+    limit_verify = await client.post("/api/cards/3ds/verify", json={
+        "challenge_id": limit_cid,
+        "otp_code": "123456"
+    })
+    assert limit_verify.status_code == 400
+    assert "spending limit" in limit_verify.json()["detail"].lower()
+
+    # 4. Audit History Verification (double-entry postings inspection)
+    ledger_res = await client.get(f"/api/ledger/audit-entries?user_id={user_id}&limit=10")
+    assert ledger_res.status_code == 200
+    entries = ledger_res.json()
+    assert len(entries) > 0
+    # Every journal entry must have balanced postings (Sum of credits == sum of debits)
+    for entry in entries:
+        assert len(entry["postings"]) >= 2
+        currencies = set(p["currency"] for p in entry["postings"])
+        for cur in currencies:
+            cur_postings = [p for p in entry["postings"] if p["currency"] == cur]
+            debits = sum(Decimal(str(p["amount"])) for p in cur_postings if p["direction"] == "DEBIT")
+            credits = sum(Decimal(str(p["amount"])) for p in cur_postings if p["direction"] == "CREDIT")
+            assert debits == credits, f"Unbalanced entry {entry['id']} in currency {cur}: debits={debits}, credits={credits}"
+
 
 
