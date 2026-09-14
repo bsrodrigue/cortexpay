@@ -9,5 +9,6 @@ class Settings(BaseSettings):
     MIN_SPREAD_PCT: float = 0.035  # 3.5%
     MAX_SPREAD_PCT: float = 0.045  # 4.5%
     OTP_MOCK_CODE: str = "123456"
+    WEBHOOK_SECRET_KEY: str = os.getenv("WEBHOOK_SECRET_KEY", "cortex_webhook_secret_hmac_2026")
 
 settings = Settings()

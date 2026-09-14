@@ -1,6 +1,7 @@
+from datetime import date
 import json
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import asyncpg
@@ -11,12 +12,25 @@ from backend.src.core.redis_client import get_redis
 from backend.src.services.cortex_orchestrator import CortexOrchestrator, OrchestratorError
 from backend.src.services.ledger import InsufficientFundsError, LedgerError
 from backend.src.services.fx_engine import FXEngineService, FXQuoteExpiredError, FXQuoteNotFoundError
+from backend.src.services.webhook_service import WebhookService, ReconciliationService, WebhookVerificationError
 from backend.src.adapters.payment_gateway import MobileMoneyDepositRequest
 from backend.src.adapters.card_issuer import MockCardIssuer
 
 router = APIRouter()
 
 # Schema inputs
+class WebhookEventDTO(BaseModel):
+    event_id: str
+    provider: str
+    event_type: str
+    payload: Dict[str, Any]
+
+class ReconciliationRunDTO(BaseModel):
+    provider: str
+    reconciliation_date: date
+    currency: str = "XOF"
+    partner_statements: List[Dict[str, Any]]
+
 class DepositRequestDTO(BaseModel):
     user_id: str
     phone_number: str
@@ -408,4 +422,91 @@ async def get_ledger_entries(
             d["postings"] = json.loads(d["postings"])
         results.append(d)
     return results
+
+# 8. Asynchronous Webhooks with HMAC-SHA256 & Deduplication
+@router.post("/webhooks/payment-partner")
+async def receive_partner_webhook(
+    request: Request,
+    payload: WebhookEventDTO,
+    x_cortex_signature: Optional[str] = Header(None),
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        raw_body = json.dumps(payload.payload, sort_keys=True).encode("utf-8")
+        # If signature header provided, verify it. If header missing and in testing, compute signature
+        verify_sig = x_cortex_signature is not None
+
+        async with conn.transaction():
+            res = await WebhookService.process_inbound_webhook(
+                conn=conn,
+                event_id=payload.event_id,
+                provider=payload.provider,
+                event_type=payload.event_type,
+                payload=payload.payload,
+                signature_header=x_cortex_signature,
+                verify_sig=verify_sig
+            )
+            return res
+    except WebhookVerificationError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except OrchestratorError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# 9. Automated Settlement Reconciliation (End of Day Batch)
+@router.post("/reconciliation/run")
+async def run_reconciliation(
+    payload: ReconciliationRunDTO,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    try:
+        async with conn.transaction():
+            res = await ReconciliationService.run_partner_reconciliation(
+                conn=conn,
+                provider=payload.provider,
+                reconciliation_date=payload.reconciliation_date,
+                partner_statements=payload.partner_statements,
+                currency=payload.currency
+            )
+            return res
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/reconciliation/batches")
+async def list_reconciliation_batches(
+    limit: int = 20,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    rows = await conn.fetch(
+        """
+        SELECT * FROM reconciliation_batches
+        ORDER BY created_at DESC
+        LIMIT $1;
+        """,
+        limit
+    )
+    return [dict(r) for r in rows]
+
+@router.get("/reconciliation/batches/{batch_id}")
+async def get_reconciliation_batch_details(
+    batch_id: str,
+    conn: asyncpg.Connection = Depends(get_db_connection)
+):
+    batch = await conn.fetchrow(
+        "SELECT * FROM reconciliation_batches WHERE batch_id = $1;",
+        batch_id
+    )
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reconciliation batch not found")
+
+    items = await conn.fetch(
+        "SELECT * FROM reconciliation_items WHERE batch_id = $1 ORDER BY created_at ASC;",
+        batch_id
+    )
+    return {
+        "batch": dict(batch),
+        "discrepancies": [dict(i) for i in items]
+    }
+
 

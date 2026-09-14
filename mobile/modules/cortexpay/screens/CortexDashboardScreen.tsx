@@ -24,6 +24,7 @@ import {
   useInitiate3DSChallenge,
   useIssueCard,
   useKYCStatus,
+  useRunReconciliation,
   useSimulateKYCDecision,
   useSimulateMerchantDebit,
   useSubmitKYC,
@@ -70,6 +71,7 @@ export const CortexDashboardScreen: React.FC = () => {
   const simulateKYCDecisionMutation = useSimulateKYCDecision();
   const initiate3DSMutation = useInitiate3DSChallenge();
   const verify3DSMutation = useVerify3DSChallenge();
+  const runReconciliationMutation = useRunReconciliation();
 
   // Modal states
   const [issueModalVisible, setIssueModalVisible] = useState(false);
@@ -291,6 +293,43 @@ export const CortexDashboardScreen: React.FC = () => {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } }; message?: string };
       Alert.alert('Erreur Simulation', err.response?.data?.detail || err.message || 'Erreur');
+    }
+  };
+
+  const handleRunReconciliation = async (
+    provider: 'WAVE' | 'ORANGE_MONEY',
+    simulateDiscrepancy: boolean
+  ) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const mockStatements = [
+        {
+          reference: `STMT_${provider}_${today}`,
+          amount: simulateDiscrepancy ? '15000.00' : '25000.00',
+        },
+      ];
+
+      const res = await runReconciliationMutation.mutateAsync({
+        provider,
+        reconciliation_date: today,
+        partner_statements: mockStatements,
+      });
+
+      const discrepancyCount = res.discrepancies.length;
+      if (discrepancyCount > 0) {
+        Alert.alert(
+          '⚠️ Écart Détecté (Audit Flagged)',
+          `Rapprochement terminé avec ${discrepancyCount} anomalie(s).\nTotal Grand Livre: ${Number(res.total_ledger).toLocaleString()} XOF\nTotal Opérateur: ${Number(res.total_partner).toLocaleString()} XOF\nÉcart net: ${Number(res.discrepancy_total).toLocaleString()} XOF.`
+        );
+      } else {
+        Alert.alert(
+          '✅ Rapprochement Parfait',
+          `Toutes les écritures du Grand Livre concordent exactement avec les relevés ${provider} (${res.matched_count} concordances, 0 écart).`
+        );
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      Alert.alert('Erreur Rapprochement', err.response?.data?.detail || err.message || 'Erreur');
     }
   };
 
@@ -541,9 +580,11 @@ export const CortexDashboardScreen: React.FC = () => {
               onSimulateDeposit={handleDepositSubmit}
               onSimulateDebit={handleSimulateDebit}
               onInitiate3DS={handleInitiate3DS}
+              onRunReconciliation={handleRunReconciliation}
               isDepositing={depositMutation.isPending}
               isDebiting={debitMutation.isPending}
               isInitiating3DS={initiate3DSMutation.isPending}
+              isReconciling={runReconciliationMutation.isPending}
             />
           </Modal>
         </Portal>

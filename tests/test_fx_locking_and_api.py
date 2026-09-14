@@ -1,12 +1,15 @@
-import pytest
+from datetime import date, datetime, timezone
 from decimal import Decimal
+import json
 import uuid
 import asyncio
 import asyncpg
+import pytest
 from httpx import AsyncClient, ASGITransport
 from backend.src.main import app
 from backend.src.core.config import settings
 from backend.src.core.redis_client import init_redis, close_redis
+from backend.src.services.webhook_service import WebhookService
 
 @pytest.fixture
 async def client():
@@ -542,6 +545,169 @@ async def test_3ds_challenge_expiry_and_security_policy(client):
             debits = sum(Decimal(str(p["amount"])) for p in cur_postings if p["direction"] == "DEBIT")
             credits = sum(Decimal(str(p["amount"])) for p in cur_postings if p["direction"] == "CREDIT")
             assert debits == credits, f"Unbalanced entry {entry['id']} in currency {cur}: debits={debits}, credits={credits}"
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_webhook_hmac_and_deduplication(client):
+    """
+    Validation du système de Webhooks Asynchrones :
+    1. Rejet si signature HMAC-SHA256 invalide (401 Unauthorized).
+    2. Acceptation avec signature HMAC valide -> Débit partenaire, Crédit wallet utilisateur.
+    3. Idempotence & Déduplication : Un 2e appel avec le même event_id retourne already_processed=True
+       sans recréditer le compte.
+    """
+    user_email = f"wh_user_{uuid.uuid4().hex[:8]}@cortexcard.test"
+    reg = await client.post("/api/auth/register/", json={
+        "email": user_email,
+        "password": "Password123!",
+        "first_name": "Moussa",
+        "last_name": "Traore"
+    })
+    user_id = reg.json()["user_id"]
+
+    event_id = f"evt_wave_{uuid.uuid4().hex[:12]}"
+    payload_data = {
+        "user_id": user_id,
+        "amount": "75000.00",
+        "operator": "WAVE",
+        "timestamp": "2026-09-14T10:30:00Z"
+    }
+    raw_payload = json.dumps(payload_data, sort_keys=True).encode("utf-8")
+    valid_sig = WebhookService.compute_signature(raw_payload)
+
+    # 1. Invalid signature -> 401
+    bad_res = await client.post(
+        "/api/webhooks/payment-partner",
+        json={
+            "event_id": event_id,
+            "provider": "WAVE",
+            "event_type": "deposit.success",
+            "payload": payload_data
+        },
+        headers={"x-cortex-signature": "invalid_hmac_hash"}
+    )
+    assert bad_res.status_code == 401
+
+    # 2. Valid signature -> 200 PROCESSED
+    good_res = await client.post(
+        "/api/webhooks/payment-partner",
+        json={
+            "event_id": event_id,
+            "provider": "WAVE",
+            "event_type": "deposit.success",
+            "payload": payload_data
+        },
+        headers={"x-cortex-signature": valid_sig}
+    )
+    assert good_res.status_code == 200
+    res_data = good_res.json()
+    assert res_data["status"] == "PROCESSED"
+    assert res_data["already_processed"] is False
+
+    # Check user wallet balance: must be exactly 75 000 XOF
+    wallets_res = await client.get(f"/api/wallets/{user_id}")
+    assert wallets_res.status_code == 200
+    assert Decimal(str(wallets_res.json()["wallets"]["XOF"]["balance"])) == Decimal("75000.0000")
+
+    # 3. Deduplication Test: Re-send the exact same webhook event -> Must not double-credit
+    dup_res = await client.post(
+        "/api/webhooks/payment-partner",
+        json={
+            "event_id": event_id,
+            "provider": "WAVE",
+            "event_type": "deposit.success",
+            "payload": payload_data
+        },
+        headers={"x-cortex-signature": valid_sig}
+    )
+    assert dup_res.status_code == 200
+    dup_data = dup_res.json()
+    assert dup_data["already_processed"] is True
+
+    # Balance must REMAIN 75 000 XOF (strictly immune to replay attacks)
+    wallets_after = await client.get(f"/api/wallets/{user_id}")
+    assert Decimal(str(wallets_after.json()["wallets"]["XOF"]["balance"])) == Decimal("75000.0000")
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_automated_reconciliation_batch(client):
+    """
+    Validation du Job de Réconciliation Automatique de fin de journée :
+    1. Création d'écritures réelles sur le Grand Livre (Dépôt Wave).
+    2. Exécution du rapprochement contre les relevés transmis par l'opérateur (Wave).
+    3. Détection des écarts (MONTANT différent, TRANSACTION manquante chez le partenaire).
+    4. Enregistrement du batch et consultation de l'audit trail (/reconciliation/batches).
+    """
+    user_email = f"rec_user_{uuid.uuid4().hex[:8]}@cortexcard.test"
+    reg = await client.post("/api/auth/register/", json={
+        "email": user_email,
+        "password": "Password123!",
+        "first_name": "Ibrahima",
+        "last_name": "Ba"
+    })
+    user_id = reg.json()["user_id"]
+
+    # Transaction 1: 50,000 XOF deposit
+    dep1 = await client.post("/api/deposit/mobile-money", json={
+        "user_id": user_id,
+        "phone_number": "+221774445566",
+        "operator": "WAVE",
+        "amount": "50000.00",
+        "otp_code": "123456"
+    })
+    assert dep1.status_code == 200
+    ref1 = dep1.json()["gateway_result"]["provider_tx_id"]
+
+    # Transaction 2: 30,000 XOF deposit
+    dep2 = await client.post("/api/deposit/mobile-money", json={
+        "user_id": user_id,
+        "phone_number": "+221774445566",
+        "operator": "WAVE",
+        "amount": "30000.00",
+        "otp_code": "123456"
+    })
+    assert dep2.status_code == 200
+    ref2 = dep2.json()["gateway_result"]["provider_tx_id"]
+
+    today = date.today().isoformat()
+
+    # Partner statement:
+    # - ref1 matches 50,000
+    # - ref2 has a mismatch (partner recorded 25,000 instead of 30,000)
+    # - ref3 is phantom (missing in our ledger)
+    partner_statements = [
+        {"reference": ref1, "amount": "50000.0000"},
+        {"reference": ref2, "amount": "25000.0000"}, # discrepancy of 5,000 XOF
+        {"reference": "GHOST_TX_999", "amount": "10000.0000"} # missing in ledger
+    ]
+
+    rec_res = await client.post("/api/reconciliation/run", json={
+        "provider": "WAVE",
+        "reconciliation_date": today,
+        "currency": "XOF",
+        "partner_statements": partner_statements
+    })
+    assert rec_res.status_code == 200
+    rec_data = rec_res.json()
+    assert rec_data["status"] == "DISCREPANCY_DETECTED"
+    assert rec_data["matched_count"] >= 1
+    assert rec_data["discrepancy_count"] >= 2
+    batch_id = rec_data["batch_id"]
+
+    # Check batch listing endpoint
+    batches_res = await client.get("/api/reconciliation/batches")
+    assert batches_res.status_code == 200
+    assert any(b["batch_id"] == batch_id for b in batches_res.json())
+
+    # Check detailed batch items endpoint
+    detail_res = await client.get(f"/api/reconciliation/batches/{batch_id}")
+    assert detail_res.status_code == 200
+    details = detail_res.json()
+    assert details["batch"]["batch_id"] == batch_id
+    assert len(details["discrepancies"]) >= 2
+    reasons = [item["reason"] for item in details["discrepancies"]]
+    assert "AMOUNT_MISMATCH" in reasons
+    assert "MISSING_IN_LEDGER" in reasons
+
 
 
 

@@ -11,9 +11,11 @@ interface SimulatorPanelProps {
   onSimulateDeposit: (operator: 'WAVE' | 'ORANGE_MONEY', amount: string, phone: string, otp: string) => Promise<void>;
   onSimulateDebit: (cardId: string, merchant: string, amountUsd: string, simulateChaos: boolean) => Promise<void>;
   onInitiate3DS?: (cardId: string, merchant: string, amountUsd: string) => Promise<void>;
+  onRunReconciliation?: (provider: 'WAVE' | 'ORANGE_MONEY', withDiscrepancy: boolean) => Promise<void>;
   isDepositing: boolean;
   isDebiting: boolean;
   isInitiating3DS?: boolean;
+  isReconciling?: boolean;
 }
 
 export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
@@ -21,12 +23,14 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   onSimulateDeposit,
   onSimulateDebit,
   onInitiate3DS,
+  onRunReconciliation,
   isDepositing,
   isDebiting,
   isInitiating3DS = false,
+  isReconciling = false,
 }) => {
   const styles = useThemedStyles(createStyles);
-  const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'DEBIT'>('DEPOSIT');
+  const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'DEBIT' | 'RECONCILIATION'>('DEPOSIT');
 
   // Deposit state
   const [operator, setOperator] = useState<'WAVE' | 'ORANGE_MONEY'>('WAVE');
@@ -38,6 +42,10 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   const [merchant, setMerchant] = useState('OpenAI');
   const [debitAmount, setDebitAmount] = useState('20.00');
   const [simulateChaos, setSimulateChaos] = useState(false);
+
+  // Reconciliation state
+  const [recProvider, setRecProvider] = useState<'WAVE' | 'ORANGE_MONEY'>('WAVE');
+  const [simulateDiscrepancy, setSimulateDiscrepancy] = useState(true);
 
   const hasCards = cards.length > 0;
   const firstCard = cards[0] as VirtualCard | undefined;
@@ -69,15 +77,16 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
 
       <SegmentedButtons
         value={activeTab}
-        onValueChange={(val) => setActiveTab(val as 'DEPOSIT' | 'DEBIT')}
+        onValueChange={(val) => setActiveTab(val as 'DEPOSIT' | 'DEBIT' | 'RECONCILIATION')}
         buttons={[
-          { value: 'DEPOSIT', label: 'Push Mobile Money' },
-          { value: 'DEBIT', label: 'Débit SaaS (Chaos)' },
+          { value: 'DEPOSIT', label: 'Push Dépôt' },
+          { value: 'DEBIT', label: 'Débit SaaS' },
+          { value: 'RECONCILIATION', label: 'Audit Rapprochement' },
         ]}
         style={styles.segmented}
       />
 
-      {activeTab === 'DEPOSIT' ? (
+      {activeTab === 'DEPOSIT' && (
         <View style={styles.tabContent}>
           <SegmentedButtons
             value={operator}
@@ -126,7 +135,9 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
             Déclencher Push USSD &amp; Créditer Wallet
           </Button>
         </View>
-      ) : (
+      )}
+
+      {activeTab === 'DEBIT' && (
         <View style={styles.tabContent}>
           {!hasCards || !firstCard ? (
             <Text style={styles.noCardText}>Veuillez émettre une carte virtuelle avant de simuler un débit.</Text>
@@ -189,6 +200,56 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
           )}
         </View>
       )}
+
+      {activeTab === 'RECONCILIATION' && (
+        <View style={styles.tabContent}>
+          <Text variant="bodySmall" style={styles.recExplainer}>
+            Compare les écritures du Grand Livre avec le relevé de l&apos;opérateur pour détecter les écarts de trésorerie (End of Day Batch).
+          </Text>
+
+          <SegmentedButtons
+            value={recProvider}
+            onValueChange={(val) => setRecProvider(val as 'WAVE' | 'ORANGE_MONEY')}
+            buttons={[
+              { value: 'WAVE', label: 'Wave Sénégal' },
+              { value: 'ORANGE_MONEY', label: 'Orange Money' },
+            ]}
+            style={styles.segmentedSub}
+          />
+
+          <View style={styles.chaosRow}>
+            <View style={styles.chaosLabelBox}>
+              <Text variant="labelLarge" style={styles.chaosTitle}>
+                🔍 Injecter un Écart Partenaire
+              </Text>
+              <Text variant="bodySmall" style={styles.chaosSubtitle}>
+                Simule un montant manquant chez l&apos;opérateur pour déclencher une alerte d&apos;audit.
+              </Text>
+            </View>
+            <Switch
+              value={simulateDiscrepancy}
+              onValueChange={setSimulateDiscrepancy}
+              color="#F59E0B"
+            />
+          </View>
+
+          <Button
+            mode="contained"
+            buttonColor="#4F46E5"
+            icon="scale-balance"
+            onPress={() => {
+              if (onRunReconciliation) {
+                void onRunReconciliation(recProvider, simulateDiscrepancy);
+              }
+            }}
+            loading={isReconciling}
+            disabled={isReconciling}
+            style={styles.actionBtn}
+          >
+            Lancer le Rapprochement Automatique
+          </Button>
+        </View>
+      )}
     </Surface>
   );
 };
@@ -218,6 +279,11 @@ const createStyles = (theme: Theme) =>
     },
     tabContent: {
       marginTop: 6,
+    },
+    recExplainer: {
+      color: theme.colors.onSurfaceVariant,
+      marginBottom: 12,
+      lineHeight: 18,
     },
     input: {
       marginBottom: 10,

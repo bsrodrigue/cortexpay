@@ -332,3 +332,32 @@ export function useSimulateKYCDecision() {
     },
   });
 }
+
+export const RECONCILIATION_QUERY_KEYS = {
+  batches: ['cortexpay', 'reconciliation', 'batches'] as const,
+};
+
+export function useReconciliationBatches(limit: number = 20) {
+  return useQuery({
+    queryKey: RECONCILIATION_QUERY_KEYS.batches,
+    queryFn: () => cortexPayApi.getReconciliationBatches(limit),
+    refetchInterval: 10000,
+  });
+}
+
+export function useRunReconciliation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: {
+      provider: string;
+      reconciliation_date: string;
+      partner_statements: { reference: string; amount: string }[];
+      currency?: string;
+    }) => cortexPayApi.runReconciliation(params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: RECONCILIATION_QUERY_KEYS.batches });
+    },
+  });
+}
+

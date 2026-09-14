@@ -252,3 +252,53 @@ export const LedgerEntrySchema = z.object({
   postings: z.array(LedgerPostingSchema),
 });
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+
+// 8. Reconciliation Batches Models
+export const ReconciliationBatchSchema = z.object({
+  id: z.string().optional(),
+  batch_id: z.string(),
+  provider: z.string(),
+  reconciliation_date: z.string(),
+  total_ledger_amount: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  total_partner_amount: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  discrepancy_amount: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  currency: z.string(),
+  status: z.enum(['BALANCED', 'DISCREPANCY_DETECTED', 'RESOLVED']),
+  matched_count: z.number(),
+  discrepancy_count: z.number(),
+  created_at: z.string().optional(),
+});
+export type ReconciliationBatch = z.infer<typeof ReconciliationBatchSchema>;
+
+export const ReconciliationDiscrepancySchema = z.object({
+  id: z.string().optional(),
+  batch_id: z.string(),
+  reference: z.string(),
+  ledger_amount: z.union([z.string(), z.number(), z.null()]).optional().transform((val) => (val === null || val === undefined ? null : String(val))),
+  partner_amount: z.union([z.string(), z.number(), z.null()]).optional().transform((val) => (val === null || val === undefined ? null : String(val))),
+  discrepancy: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  currency: z.string(),
+  reason: z.string(),
+  status: z.string(),
+  resolution_notes: z.string().nullable().optional(),
+});
+export type ReconciliationDiscrepancy = z.infer<typeof ReconciliationDiscrepancySchema>;
+
+export interface ReconciliationStatementItem {
+  reference: string;
+  amount: string;
+}
+
+export interface ReconciliationRunResult {
+  batch_id: string;
+  provider: string;
+  reconciliation_date: string;
+  status: 'BALANCED' | 'DISCREPANCY_DETECTED';
+  total_ledger: string | number;
+  total_partner: string | number;
+  discrepancy_total: string | number;
+  matched_count: number;
+  discrepancy_count: number;
+  discrepancies: ReconciliationDiscrepancy[];
+}
+

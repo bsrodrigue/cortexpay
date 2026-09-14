@@ -30,6 +30,10 @@ import {
   MerchantDebitResponseSchema,
   QuoteRequest,
   QuoteRequestSchema,
+  ReconciliationBatch,
+  ReconciliationBatchSchema,
+  ReconciliationRunResult,
+  ReconciliationStatementItem,
   ThreeDSChallenge,
   ThreeDSChallengeSchema,
   ThreeDSInitiateRequest,
@@ -220,6 +224,27 @@ export const cortexPayApi = {
     }
     const response = await http.get<LedgerEntry[]>('/ledger/audit-entries', { params });
     return validateModel(z.array(LedgerEntrySchema), response, 'Ledger Audit Entries');
+  },
+
+  /**
+   * Fetch Partner Settlement Reconciliation Batches
+   */
+  async getReconciliationBatches(limit: number = 20): Promise<ReconciliationBatch[]> {
+    const response = await http.get<ReconciliationBatch[]>('/reconciliation/batches', { params: { limit } });
+    return validateModel(z.array(ReconciliationBatchSchema), response, 'Reconciliation Batches');
+  },
+
+  /**
+   * Run automated Partner Settlement Reconciliation Batch
+   */
+  async runReconciliation(params: {
+    provider: string;
+    reconciliation_date: string;
+    partner_statements: ReconciliationStatementItem[];
+    currency?: string;
+  }): Promise<ReconciliationRunResult> {
+    const response = await http.post<ReconciliationRunResult>('/reconciliation/run', params);
+    return response;
   },
 };
 
