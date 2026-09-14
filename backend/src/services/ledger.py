@@ -151,31 +151,28 @@ class LedgerService:
         )
         entry_id = entry_row["id"]
 
-        # Insert Postings
-        for p in entry_data.postings:
-            await conn.execute(
-                """
-                INSERT INTO postings (entry_id, account_id, amount, direction, currency, sequence_no)
-                VALUES ($1, $2, $3, $4, $5, $6);
-                """,
-                entry_id,
-                p.account_id,
-                p.amount,
-                p.direction.value,
-                p.currency,
-                p.sequence_no,
-            )
+        # Insert Postings (Batched via executemany for high throughput)
+        posting_records = [
+            (entry_id, p.account_id, p.amount, p.direction.value, p.currency, p.sequence_no)
+            for p in entry_data.postings
+        ]
+        await conn.executemany(
+            """
+            INSERT INTO postings (entry_id, account_id, amount, direction, currency, sequence_no)
+            VALUES ($1, $2, $3, $4, $5, $6);
+            """,
+            posting_records
+        )
 
-        # Update Account Balances
-        for acc_id, change in net_changes.items():
-            await conn.execute(
-                """
-                UPDATE accounts
-                SET balance = balance + $1
-                WHERE id = $2;
-                """,
-                change,
-                acc_id,
-            )
+        # Update Account Balances (Batched via executemany)
+        balance_update_records = [(change, acc_id) for acc_id, change in net_changes.items()]
+        await conn.executemany(
+            """
+            UPDATE accounts
+            SET balance = balance + $1
+            WHERE id = $2;
+            """,
+            balance_update_records
+        )
 
         return dict(entry_row)

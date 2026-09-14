@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, AppStateStatus, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, IconButton, Modal, Portal, SegmentedButtons, Surface, Text, TextInput } from 'react-native-paper';
+import { Button, IconButton, Surface, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getApiErrorMessage } from '@/libs/api/errors';
@@ -11,17 +11,11 @@ import { useAuthStore } from '@/modules/auth/store';
 import { SideMenu } from '@/modules/shared/components/SideMenu';
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
-import { CardDetailsModal } from '../components/CardDetailsModal';
-import { ConvertModal } from '../components/ConvertModal';
-import { DepositModal } from '../components/DepositModal';
-import { KYCVerificationModal } from '../components/KYCVerificationModal';
+import { ActiveModalType,DashboardModals } from '../components/DashboardModals';
 import { NeobankActionRow } from '../components/NeobankActionRow';
 import { NeobankCardView } from '../components/NeobankCardView';
 import { NeobankHeroBalance } from '../components/NeobankHeroBalance';
-import { SimulatorPanel } from '../components/SimulatorPanel';
-import { ThreeDSModal } from '../components/ThreeDSModal';
 import { TransactionHistory } from '../components/TransactionHistory';
-import { WithdrawModal } from '../components/WithdrawModal';
 import {
   useConvertCurrency,
   useDepositMobileMoney,
@@ -86,16 +80,9 @@ export const CortexDashboardScreen: React.FC = () => {
   const openDisputeMutation = useOpenDispute();
   const resolveDisputeMutation = useResolveDispute();
 
-  // Modal states
-  const [issueModalVisible, setIssueModalVisible] = useState(false);
-  const [convertModalVisible, setConvertModalVisible] = useState(false);
-  const [depositModalVisible, setDepositModalVisible] = useState(false);
-  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
-  const [cardDetailsModalVisible, setCardDetailsModalVisible] = useState(false);
+  // Unified Modal state
+  const [activeModal, setActiveModal] = useState<ActiveModalType>(null);
   const [selectedCard, setSelectedCard] = useState<VirtualCard | null>(null);
-  const [simulatorModalVisible, setSimulatorModalVisible] = useState(false);
-  const [kycModalVisible, setKycModalVisible] = useState(false);
-  const [threeDSModalVisible, setThreeDSModalVisible] = useState(false);
   const [active3DSChallenge, setActive3DSChallenge] = useState<ThreeDSChallenge | null>(null);
 
   const effectiveUserId = user?.user_id || (user?.id ? `usr_${user.id}` : 'usr_cortex_demo');
@@ -146,32 +133,30 @@ export const CortexDashboardScreen: React.FC = () => {
 
   const handleOpenIssueCard = () => {
     if (!isKYCApproved) {
-      setKycModalVisible(true);
+      setActiveModal('KYC');
       return;
     }
-    setIssueModalVisible(true);
+    setActiveModal('ISSUE_CARD');
   };
 
-  const handleIssueCardSubmit = () => {
-    void issueCardMutation.mutateAsync({
-      cardholderName,
-      initialFundingUsd: initialFunding,
-      card_type: cardType,
-      label: cardLabel,
-    })
-      .then(() => {
-        setIssueModalVisible(false);
-        Alert.alert('Succès', `Carte virtuelle ${cardType === 'BUSINESS' ? 'Business ($10k)' : 'Standard ($5k)'} émise et provisionnée avec succès !`);
-      })
-      .catch((e: unknown) => {
-        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
-        if (err.response?.status === 403) {
-          setIssueModalVisible(false);
-          setKycModalVisible(true);
-        } else {
-          Alert.alert('Erreur', err.response?.data?.detail || err.message || 'Erreur');
-        }
+  const handleIssueCardSubmit = async () => {
+    try {
+      await issueCardMutation.mutateAsync({
+        cardholderName,
+        initialFundingUsd: initialFunding,
+        card_type: cardType,
+        label: cardLabel,
       });
+      setActiveModal(null);
+      Alert.alert('Succès', `Carte virtuelle ${cardType === 'BUSINESS' ? 'Business ($10k)' : 'Standard ($5k)'} émise et provisionnée avec succès !`);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+      if (err.response?.status === 403) {
+        setActiveModal('KYC');
+      } else {
+        Alert.alert('Erreur', err.response?.data?.detail || err.message || 'Erreur');
+      }
+    }
   };
 
   const handleInitiate3DS = async (cardId: string, merchant: string, amountUsd: string) => {
@@ -181,9 +166,8 @@ export const CortexDashboardScreen: React.FC = () => {
         merchantName: merchant,
         amountUsd,
       });
-      setSimulatorModalVisible(false);
       setActive3DSChallenge(challenge);
-      setThreeDSModalVisible(true);
+      setActiveModal('THREE_DS');
     } catch (e: unknown) {
       Alert.alert('Erreur 3DS', getApiErrorMessage(e));
     }
@@ -246,7 +230,7 @@ export const CortexDashboardScreen: React.FC = () => {
     try {
       await topupCardMutation.mutateAsync({ cardId, amountUsd });
       Alert.alert('Carte Rechargée', `+$${Number(amountUsd).toFixed(2)} USD ajoutés à votre carte.`);
-      setCardDetailsModalVisible(false);
+      setActiveModal(null);
     } catch (e: unknown) {
       Alert.alert('Échec Recharge Carte', getApiErrorMessage(e));
       throw e;
@@ -257,7 +241,7 @@ export const CortexDashboardScreen: React.FC = () => {
     try {
       await updateLimitMutation.mutateAsync({ cardId, spendingLimitMonthly: newLimitUsd });
       Alert.alert('Plafond Mis à Jour', `Nouveau plafond mensuel : $${Number(newLimitUsd).toFixed(0)} USD.`);
-      setCardDetailsModalVisible(false);
+      setActiveModal(null);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } }; message?: string };
       Alert.alert('Échec Modification', err.response?.data?.detail || err.message || 'Erreur');
@@ -460,7 +444,7 @@ export const CortexDashboardScreen: React.FC = () => {
               icon="flask-outline"
               size={22}
               iconColor="#6B7280"
-              onPress={() => setSimulatorModalVisible(true)}
+              onPress={() => setActiveModal('SIMULATOR')}
               accessibilityLabel="Mode Test / Sandbox"
             />
           </View>
@@ -482,7 +466,7 @@ export const CortexDashboardScreen: React.FC = () => {
             <Button
               mode="contained-tonal"
               compact
-              onPress={() => setKycModalVisible(true)}
+              onPress={() => setActiveModal('KYC')}
               style={styles.kycBannerBtn}
             >
               {kycData?.kyc_status === 'SUBMITTED' ? 'Voir l\'état' : 'Vérifier'}
@@ -500,9 +484,9 @@ export const CortexDashboardScreen: React.FC = () => {
 
         {/* Neobank Circular Quick Actions */}
         <NeobankActionRow
-          onDeposit={() => setDepositModalVisible(true)}
-          onConvert={() => setConvertModalVisible(true)}
-          onWithdraw={() => setWithdrawModalVisible(true)}
+          onDeposit={() => setActiveModal('DEPOSIT')}
+          onConvert={() => setActiveModal('CONVERT')}
+          onWithdraw={() => setActiveModal('WITHDRAW')}
           onIssueCard={handleOpenIssueCard}
         />
 
@@ -523,7 +507,7 @@ export const CortexDashboardScreen: React.FC = () => {
               }}
               onManage={(card) => {
                 setSelectedCard(card);
-                setCardDetailsModalVisible(true);
+                setActiveModal('CARD_DETAILS');
               }}
               isFreezing={freezeMutation.isPending}
             />
@@ -559,164 +543,63 @@ export const CortexDashboardScreen: React.FC = () => {
           userId={effectiveUserId}
         />
 
-        {/* KYC Modal */}
-        <KYCVerificationModal
-          visible={kycModalVisible}
-          onDismiss={() => setKycModalVisible(false)}
+        {/* Unified Dashboard Modals */}
+        <DashboardModals
+          activeModal={activeModal}
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedCard(null);
+            setActive3DSChallenge(null);
+          }}
+          xofBalance={xofWallet?.balance || '0'}
+          usdBalance={usdWallet?.balance || '0.00'}
+          cards={cards || []}
+          selectedCard={selectedCard}
+          disputes={userDisputes || []}
           kycData={kycData}
+          active3DSChallenge={active3DSChallenge}
+          cardType={cardType}
+          setCardType={setCardType}
+          cardLabel={cardLabel}
+          setCardLabel={setCardLabel}
+          cardholderName={cardholderName}
+          setCardholderName={setCardholderName}
+          initialFunding={initialFunding}
+          setInitialFunding={setInitialFunding}
+          onDeposit={handleDepositSubmit}
+          onWithdraw={handleWithdrawSubmit}
+          onGetQuote={async (amt) => fxQuoteMutation.mutateAsync({ from_amount_xof: amt })}
+          onConvert={handleConvertSubmit}
+          onIssueCard={handleIssueCardSubmit}
+          onTopupCard={handleTopupCardSubmit}
+          onUpdateLimit={handleUpdateLimitSubmit}
           onSubmitKYC={async (params) => {
             await submitKYCMutation.mutateAsync(params);
             Alert.alert('Documents Reçus', 'Vos pièces d\'identité sont enregistrées.');
           }}
-          onSimulateDecision={async (decision, tier, reason) => {
+          onSimulateKYC={async (decision, tier, reason) => {
             await simulateKYCDecisionMutation.mutateAsync({ decision, tier, rejection_reason: reason });
             Alert.alert('Statut KYC mis à jour', `Décision appliquée : ${decision}`);
           }}
-          isSubmitting={submitKYCMutation.isPending}
-        />
-
-        {/* Convert Modal */}
-        <ConvertModal
-          visible={convertModalVisible}
-          onDismiss={() => setConvertModalVisible(false)}
-          xofBalance={xofWallet?.balance || '0'}
-          onGetQuote={async (amt) => fxQuoteMutation.mutateAsync({ from_amount_xof: amt })}
-          onExecuteConvert={handleConvertSubmit}
+          onSimulateDebit={handleSimulateDebit}
+          onInitiate3DS={handleInitiate3DS}
+          onVerify3DS={handleVerify3DS}
+          onRunReconciliation={handleRunReconciliation}
+          onResolveDispute={handleResolveDispute}
+          isDepositing={depositMutation.isPending}
+          isWithdrawing={withdrawMutation.isPending}
           isGettingQuote={fxQuoteMutation.isPending}
           isConverting={convertMutation.isPending}
-        />
-
-        {/* Deposit Modal */}
-        <DepositModal
-          visible={depositModalVisible}
-          onDismiss={() => setDepositModalVisible(false)}
-          onDeposit={handleDepositSubmit}
-          isDepositing={depositMutation.isPending}
-        />
-
-        {/* Withdraw Modal (Cash-Out) */}
-        <WithdrawModal
-          visible={withdrawModalVisible}
-          onDismiss={() => setWithdrawModalVisible(false)}
-          xofBalance={xofWallet?.balance || '0'}
-          onWithdraw={handleWithdrawSubmit}
-          isWithdrawing={withdrawMutation.isPending}
-        />
-
-        {/* Card Management / Topup / Spending Limit Modal */}
-        <CardDetailsModal
-          visible={cardDetailsModalVisible}
-          onDismiss={() => {
-            setCardDetailsModalVisible(false);
-            setSelectedCard(null);
-          }}
-          card={selectedCard}
-          walletUsdBalance={usdWallet?.balance || '0.00'}
-          onTopup={handleTopupCardSubmit}
-          onUpdateLimit={handleUpdateLimitSubmit}
-          isToppingUp={topupCardMutation.isPending}
+          isIssuingCard={issueCardMutation.isPending}
+          isToppingUpCard={topupCardMutation.isPending}
           isUpdatingLimit={updateLimitMutation.isPending}
+          isSubmittingKYC={submitKYCMutation.isPending}
+          isDebiting={debitMutation.isPending}
+          isInitiating3DS={initiate3DSMutation.isPending}
+          isVerifying3DS={verify3DSMutation.isPending}
+          isReconciling={runReconciliationMutation.isPending}
+          isResolvingDispute={resolveDisputeMutation.isPending}
         />
-
-        {/* Sandbox / Simulator Modal */}
-        <Portal>
-          <Modal
-            visible={simulatorModalVisible}
-            onDismiss={() => setSimulatorModalVisible(false)}
-            contentContainerStyle={styles.simulatorModalContent}
-          >
-            <View style={styles.modalCloseRow}>
-              <IconButton icon="close" size={20} onPress={() => setSimulatorModalVisible(false)} />
-            </View>
-            <SimulatorPanel
-              cards={cards || []}
-              disputes={userDisputes || []}
-              onSimulateDeposit={handleDepositSubmit}
-              onSimulateDebit={handleSimulateDebit}
-              onInitiate3DS={handleInitiate3DS}
-              onRunReconciliation={handleRunReconciliation}
-              onResolveDispute={handleResolveDispute}
-              isDepositing={depositMutation.isPending}
-              isDebiting={debitMutation.isPending}
-              isInitiating3DS={initiate3DSMutation.isPending}
-              isReconciling={runReconciliationMutation.isPending}
-              isResolvingDispute={resolveDisputeMutation.isPending}
-            />
-          </Modal>
-        </Portal>
-
-        {/* 3DS Challenge Verification Modal */}
-        <ThreeDSModal
-          visible={threeDSModalVisible}
-          onDismiss={() => {
-            setThreeDSModalVisible(false);
-            setActive3DSChallenge(null);
-          }}
-          challenge={active3DSChallenge}
-          onVerify={handleVerify3DS}
-          isVerifying={verify3DSMutation.isPending}
-        />
-
-        {/* Issue Card Modal */}
-        <Portal>
-          <Modal
-            visible={issueModalVisible}
-            onDismiss={() => setIssueModalVisible(false)}
-            contentContainerStyle={styles.modalContent}
-          >
-            <Text variant="titleLarge" style={styles.modalTitle}>
-              Créer une Carte Virtuelle USD
-            </Text>
-
-            <Text variant="bodySmall" style={styles.fieldLabel}>
-              Type de Carte &amp; Plafond Mensuel
-            </Text>
-            <SegmentedButtons
-              value={cardType}
-              onValueChange={(val) => setCardType(val as 'STANDARD' | 'BUSINESS')}
-              buttons={[
-                { value: 'STANDARD', label: 'Standard ($5k)' },
-                { value: 'BUSINESS', label: 'Business ($10k)' },
-              ]}
-              style={styles.segmentedType}
-            />
-
-            <TextInput
-              label="Libellé personnalisé (ex: Pubs Meta, SaaS Dev)"
-              value={cardLabel}
-              onChangeText={setCardLabel}
-              mode="outlined"
-              style={styles.modalInput}
-            />
-
-            <TextInput
-              label="Nom du titulaire"
-              value={cardholderName}
-              onChangeText={setCardholderName}
-              mode="outlined"
-              style={styles.modalInput}
-            />
-
-            <TextInput
-              label="Provisionnement initial (USD)"
-              value={initialFunding}
-              onChangeText={setInitialFunding}
-              keyboardType="numeric"
-              mode="outlined"
-              style={styles.modalInput}
-            />
-
-            <Button
-              mode="contained"
-              onPress={handleIssueCardSubmit}
-              loading={issueCardMutation.isPending}
-              disabled={issueCardMutation.isPending}
-              style={styles.modalBtn}
-            >
-              Émettre la carte
-            </Button>
-          </Modal>
-        </Portal>
       </ScrollView>
 
       {/* Biometric Security Overlay when App is locked */}
@@ -873,39 +756,6 @@ const createStyles = (theme: Theme) =>
     },
     emptyBtn: {
       marginTop: 4,
-    },
-    modalContent: {
-      backgroundColor: '#FFFFFF',
-      padding: 20,
-      margin: 20,
-      borderRadius: 16,
-    },
-    simulatorModalContent: {
-      backgroundColor: 'transparent',
-      margin: 10,
-    },
-    modalCloseRow: {
-      alignItems: 'flex-end',
-      marginBottom: -10,
-      zIndex: 10,
-    },
-    modalTitle: {
-      fontWeight: 'bold',
-      marginBottom: 16,
-    },
-    fieldLabel: {
-      color: theme.colors.onSurfaceVariant,
-      marginBottom: 6,
-      fontWeight: '600',
-    },
-    segmentedType: {
-      marginBottom: 14,
-    },
-    modalInput: {
-      marginBottom: 12,
-    },
-    modalBtn: {
-      marginTop: 8,
     },
     lockOverlay: {
       ...StyleSheet.absoluteFillObject,

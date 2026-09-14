@@ -15,4 +15,10 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
+    def model_post_init(self, __context):
+        if self.ENVIRONMENT == "production":
+            raw_secret = os.getenv("JWT_SECRET_KEY")
+            if not raw_secret or "fintech_production" in raw_secret:
+                raise ValueError("FATAL SECURITY MISCONFIGURATION: An explicit, secure JWT_SECRET_KEY environment variable is required in production.")
+
 settings = Settings()
