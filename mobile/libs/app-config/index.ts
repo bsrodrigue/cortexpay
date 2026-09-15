@@ -26,7 +26,7 @@ const urlSchema = z.url();
  *  - The override is persisted in AsyncStorage across restarts.
  */
 export const AppConfig = {
-  appName: 'BuildShare',
+  appName: 'CortexPay',
 
   /**
    * Returns the effective API base URL.

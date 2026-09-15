@@ -27,7 +27,7 @@
   "auth": {
     "login": {
       "title": "{{appName}}",
-      "subtitle": "Connectez-vous pour gérer vos builds.",
+      "subtitle": "Connectez-vous à votre compte FinTech.",
       "email_label": "Email",
       "password_label": "Mot de passe",
       "submit": "Se connecter",
