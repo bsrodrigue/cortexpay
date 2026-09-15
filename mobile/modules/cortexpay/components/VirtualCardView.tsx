@@ -24,7 +24,14 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
   const styles = useThemedStyles(createStyles);
 
   const isBusiness = card.card_type === 'BUSINESS';
-  const displayPan = revealed && card.pan ? card.pan : card.masked_pan;
+
+  const formatCardNumber = (num: string) => {
+    const cleaned = num.replace(/\s+/g, '');
+    return cleaned.replace(/(\d{4})/g, '$1 ').trim();
+  };
+
+  const rawPan = revealed && card.pan ? card.pan : card.masked_pan;
+  const displayPan = formatCardNumber(rawPan);
   const displayCvv = revealed && card.cvv ? card.cvv : '•••';
 
   const handleToggleReveal = async () => {
@@ -76,7 +83,13 @@ export const VirtualCardView: React.FC<VirtualCardViewProps> = ({
         />
       </View>
 
-      <Text variant="headlineSmall" style={styles.panText}>
+      <Text
+        variant="headlineSmall"
+        style={styles.panText}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
         {displayPan}
       </Text>
 

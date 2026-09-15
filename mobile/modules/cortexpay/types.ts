@@ -105,7 +105,10 @@ export const VirtualCardSchema = z.object({
   card_type: z.enum(['STANDARD', 'BUSINESS']).default('STANDARD'),
   label: z.string().default('Ma Carte Cortex'),
   created_at: z.string().optional().default(() => new Date().toISOString()),
-});
+}).transform((data) => ({
+  ...data,
+  pan: data.pan || data.encrypted_pan || undefined,
+}));
 export type VirtualCard = z.infer<typeof VirtualCardSchema>;
 
 export const CardIssueRequestSchema = z.object({

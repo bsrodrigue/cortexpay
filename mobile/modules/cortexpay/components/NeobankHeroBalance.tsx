@@ -90,7 +90,12 @@ export const NeobankHeroBalance: React.FC<NeobankHeroBalanceProps> = ({
           <Text style={styles.privacyMask}>••••••••</Text>
         ) : selectedCurrency === 'XOF' ? (
           <View style={styles.amountWrap}>
-            <Text style={styles.amountInteger}>
+            <Text
+              style={styles.amountInteger}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {numXof.toLocaleString('fr-FR')}
             </Text>
             <Text style={styles.currencyCode}>XOF</Text>
@@ -98,7 +103,12 @@ export const NeobankHeroBalance: React.FC<NeobankHeroBalanceProps> = ({
         ) : (
           <View style={styles.amountWrap}>
             <Text style={styles.currencySymbol}>$</Text>
-            <Text style={styles.amountInteger}>
+            <Text
+              style={styles.amountInteger}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {numUsd.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,

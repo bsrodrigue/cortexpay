@@ -263,28 +263,37 @@ const createStyles = (theme: Theme) =>
     row: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
     },
     label: {
       color: '#64748B',
       fontWeight: '600',
       letterSpacing: 0.5,
       fontSize: 10,
+      flexShrink: 0,
     },
     value: {
       color: theme.colors.onSurface,
       flexShrink: 1,
       textAlign: 'right',
       marginLeft: 8,
+      flexWrap: 'wrap',
     },
     valueBold: {
       color: theme.colors.onSurface,
       fontWeight: 'bold',
+      flexShrink: 1,
+      textAlign: 'right',
+      marginLeft: 8,
+      flexWrap: 'wrap',
     },
     monospaceValue: {
       fontFamily: 'monospace',
       fontSize: 10,
       color: '#475569',
+      flexShrink: 1,
+      textAlign: 'right',
+      marginLeft: 8,
     },
     ledgerSectionTitle: {
       color: '#94A3B8',

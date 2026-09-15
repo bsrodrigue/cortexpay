@@ -209,10 +209,15 @@ const createStyles = (theme: Theme) =>
     },
     detailLabel: {
       color: theme.colors.onSurfaceVariant,
+      flexShrink: 0,
+      marginRight: 8,
     },
     detailValue: {
       fontWeight: '600',
       color: theme.colors.onSurface,
+      flexShrink: 1,
+      textAlign: 'right',
+      flexWrap: 'wrap',
     },
     amountValue: {
       fontWeight: 'bold',

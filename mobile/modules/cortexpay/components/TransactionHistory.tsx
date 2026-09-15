@@ -281,6 +281,9 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                     <Text
                       variant="labelLarge"
                       style={[styles.itemAmount, item.isPositive ? styles.positiveAmount : styles.negativeAmount]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
                     >
                       {item.amount} {item.currency}
                     </Text>

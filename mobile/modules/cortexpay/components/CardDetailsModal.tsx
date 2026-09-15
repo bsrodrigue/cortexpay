@@ -186,10 +186,12 @@ const createStyles = (theme: Theme) =>
     modalTitle: {
       fontWeight: 'bold',
       color: theme.colors.onSurface,
+      flexWrap: 'wrap',
     },
     cardSubtitle: {
       color: theme.colors.onSurfaceVariant,
       marginBottom: 16,
+      flexWrap: 'wrap',
     },
     metricsCard: {
       backgroundColor: theme.colors.surface,
@@ -214,11 +216,14 @@ const createStyles = (theme: Theme) =>
     },
     spentRight: {
       alignItems: 'flex-end',
+      flexShrink: 1,
+      marginLeft: 8,
     },
     spentValue: {
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginTop: 2,
+      textAlign: 'right',
     },
     progressBar: {
       height: 8,

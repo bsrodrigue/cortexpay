@@ -29,7 +29,13 @@ export const NeobankCardView: React.FC<NeobankCardViewProps> = ({
   const isBusiness = card.card_type === 'BUSINESS';
   const isFrozen = card.status === 'FROZEN';
 
-  const displayPan = revealed && card.pan ? card.pan : card.masked_pan;
+  const formatCardNumber = (num: string) => {
+    const cleaned = num.replace(/\s+/g, '');
+    return cleaned.replace(/(\d{4})/g, '$1 ').trim();
+  };
+
+  const rawPan = revealed && card.pan ? card.pan : card.masked_pan;
+  const displayPan = formatCardNumber(rawPan);
   const displayCvv = revealed && card.cvv ? card.cvv : '•••';
 
   const handleToggleReveal = async () => {
@@ -134,7 +140,14 @@ export const NeobankCardView: React.FC<NeobankCardViewProps> = ({
           onPress={() => void handleCopyPan()}
           style={styles.panRow}
         >
-          <Text style={styles.panNumber}>{displayPan}</Text>
+          <Text
+            style={styles.panNumber}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {displayPan}
+          </Text>
           {revealed && (
             <IconButton icon="content-copy" iconColor="#93C5FD" size={16} style={styles.noMarginIcon} />
           )}
@@ -325,13 +338,15 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       gap: 6,
       marginVertical: 4,
+      flexWrap: 'nowrap',
     },
     panNumber: {
-      fontSize: 20,
+      fontSize: 19,
       fontWeight: '700',
-      letterSpacing: 2,
+      letterSpacing: 1.5,
       color: '#FFFFFF',
       fontVariant: ['tabular-nums'],
+      flexShrink: 1,
     },
     bottomRow: {
       flexDirection: 'row',
