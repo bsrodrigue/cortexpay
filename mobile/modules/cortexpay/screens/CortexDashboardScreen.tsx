@@ -440,13 +440,6 @@ export const CortexDashboardScreen: React.FC = () => {
                 {user ? `Bonjour, ${user.first_name}` : 'FinTech Multi-Devises'}
               </Text>
             </View>
-            <IconButton
-              icon="flask-outline"
-              size={22}
-              iconColor="#6B7280"
-              onPress={() => setActiveModal('SIMULATOR')}
-              accessibilityLabel="Mode Test / Sandbox"
-            />
           </View>
         </View>
 
