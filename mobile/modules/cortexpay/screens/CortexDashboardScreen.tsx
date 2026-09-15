@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, AppStateStatus, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,6 +13,7 @@ import { SideMenu } from '@/modules/shared/components/SideMenu';
 import { Theme, useThemedStyles } from '@/modules/shared/theme';
 
 import { ActiveModalType,DashboardModals } from '../components/DashboardModals';
+import { ModernTabBar, TabKey } from '../components/ModernTabBar';
 import { NeobankActionRow } from '../components/NeobankActionRow';
 import { NeobankCardView } from '../components/NeobankCardView';
 import { NeobankHeroBalance } from '../components/NeobankHeroBalance';
@@ -49,6 +51,15 @@ export const CortexDashboardScreen: React.FC = () => {
   const styles = useThemedStyles(createStyles);
   const { user } = useAuthStore();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('home');
+
+  const handleTabChange = (tab: TabKey) => {
+    if (tab === 'settings') {
+      router.push('/(protected)/settings');
+      return;
+    }
+    setActiveTab(tab);
+  };
 
   // Queries
   const { data: walletsData, isLoading: isLoadingWallets, refetch: refetchWallets } = useWallets();
@@ -415,7 +426,7 @@ export const CortexDashboardScreen: React.FC = () => {
       <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 90 }]}
         refreshControl={
           <RefreshControl
             refreshing={isLoadingWallets || isLoadingCards || isLoadingTransactions}
@@ -467,74 +478,84 @@ export const CortexDashboardScreen: React.FC = () => {
           </Surface>
         )}
 
-        {/* Neobank Hero Balance (Option B: Clean Minimalist) */}
-        <NeobankHeroBalance
-          xofBalance={xofWallet?.balance || '0'}
-          usdBalance={usdWallet?.balance || '0.00'}
-          onRefresh={handleRefresh}
-          isRefreshing={isLoadingWallets || isLoadingCards || isLoadingTransactions}
-        />
-
-        {/* Neobank Circular Quick Actions */}
-        <NeobankActionRow
-          onDeposit={() => setActiveModal('DEPOSIT')}
-          onConvert={() => setActiveModal('CONVERT')}
-          onWithdraw={() => setActiveModal('WITHDRAW')}
-          onIssueCard={handleOpenIssueCard}
-        />
-
-        {/* Cards Section */}
-        <View style={styles.sectionHeader}>
-          <Text variant="titleLarge" style={styles.sectionTitle}>
-            Mes Cartes Virtuelles USD ({cards?.length || 0})
-          </Text>
-        </View>
-
-        {cards && cards.length > 0 ? (
-          cards.map((c) => (
-            <NeobankCardView
-              key={c.card_id}
-              card={c}
-              onToggleFreeze={(cardId) => {
-                freezeMutation.mutate(cardId);
-              }}
-              onManage={(card) => {
-                setSelectedCard(card);
-                setActiveModal('CARD_DETAILS');
-              }}
-              isFreezing={freezeMutation.isPending}
-            />
-          ))
-        ) : (
-          <Surface style={styles.emptyCardContainer} elevation={1}>
-            <Text variant="bodyMedium" style={styles.emptyText}>
-              {isKYCApproved
-                ? 'Vous n\'avez pas encore de carte virtuelle USD active.'
-                : 'Effectuez votre vérification d\'identité pour émettre votre première carte Visa.'}
-            </Text>
-            <Button
-              mode="contained"
-              icon={isKYCApproved ? 'credit-card-plus' : 'shield-account'}
-              onPress={handleOpenIssueCard}
-              style={styles.emptyBtn}
-            >
-              {isKYCApproved ? 'Créer ma 1ère Carte Virtuelle USD' : 'Valider mon identité (KYC)'}
-            </Button>
-          </Surface>
+        {/* Neobank Hero Balance (Option B: Clean Minimalist) - Visible on Home & Cards */}
+        {activeTab !== 'activity' && (
+          <NeobankHeroBalance
+            xofBalance={xofWallet?.balance || '0'}
+            usdBalance={usdWallet?.balance || '0.00'}
+            onRefresh={handleRefresh}
+            isRefreshing={isLoadingWallets || isLoadingCards || isLoadingTransactions}
+          />
         )}
 
-        {/* Double-Entry Ledger Transaction Activity */}
-        <TransactionHistory
-          entries={transactions}
-          isLoading={isLoadingTransactions}
-          onRefresh={() => void refetchTransactions()}
-          onExportLedger={() => {
-            void handleExportLedger();
-          }}
-          onOpenDispute={handleOpenDispute}
-          isExporting={exportLedgerMutation.isPending}
-          userId={effectiveUserId}
-        />
+        {/* Neobank Circular Quick Actions - Visible on Home */}
+        {activeTab === 'home' && (
+          <NeobankActionRow
+            onDeposit={() => setActiveModal('DEPOSIT')}
+            onConvert={() => setActiveModal('CONVERT')}
+            onWithdraw={() => setActiveModal('WITHDRAW')}
+            onIssueCard={handleOpenIssueCard}
+          />
+        )}
+
+        {/* Cards Section - Visible on Home & Cards */}
+        {(activeTab === 'home' || activeTab === 'cards') && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleLarge" style={styles.sectionTitle}>
+                Mes Cartes Virtuelles USD ({cards?.length || 0})
+              </Text>
+            </View>
+
+            {cards && cards.length > 0 ? (
+              cards.map((c) => (
+                <NeobankCardView
+                  key={c.card_id}
+                  card={c}
+                  onToggleFreeze={(cardId) => {
+                    freezeMutation.mutate(cardId);
+                  }}
+                  onManage={(card) => {
+                    setSelectedCard(card);
+                    setActiveModal('CARD_DETAILS');
+                  }}
+                  isFreezing={freezeMutation.isPending}
+                />
+              ))
+            ) : (
+              <Surface style={styles.emptyCardContainer} elevation={1}>
+                <Text variant="bodyMedium" style={styles.emptyText}>
+                  {isKYCApproved
+                    ? 'Vous n\'avez pas encore de carte virtuelle USD active.'
+                    : 'Effectuez votre vérification d\'identité pour émettre votre première carte Visa.'}
+                </Text>
+                <Button
+                  mode="contained"
+                  icon={isKYCApproved ? 'credit-card-plus' : 'shield-account'}
+                  onPress={handleOpenIssueCard}
+                  style={styles.emptyBtn}
+                >
+                  {isKYCApproved ? 'Créer ma 1ère Carte Virtuelle USD' : 'Valider mon identité (KYC)'}
+                </Button>
+              </Surface>
+            )}
+          </>
+        )}
+
+        {/* Double-Entry Ledger Transaction Activity - Visible on Home & Activity */}
+        {(activeTab === 'home' || activeTab === 'activity') && (
+          <TransactionHistory
+            entries={transactions}
+            isLoading={isLoadingTransactions}
+            onRefresh={() => void refetchTransactions()}
+            onExportLedger={() => {
+              void handleExportLedger();
+            }}
+            onOpenDispute={handleOpenDispute}
+            isExporting={exportLedgerMutation.isPending}
+            userId={effectiveUserId}
+          />
+        )}
 
         {/* Unified Dashboard Modals */}
         <DashboardModals
@@ -594,6 +615,13 @@ export const CortexDashboardScreen: React.FC = () => {
           isResolvingDispute={resolveDisputeMutation.isPending}
         />
       </ScrollView>
+
+      {/* Floating Modern Tab Bar Menu */}
+      <ModernTabBar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onActionPress={() => setActiveModal('CONVERT')}
+      />
 
       {/* Biometric Security Overlay when App is locked */}
       {isAppLocked && (
