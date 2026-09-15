@@ -11,6 +11,7 @@ from backend.src.core.config import settings
 from backend.src.api.routes import router as api_router
 from backend.src.api.auth_routes import auth_router
 from backend.src.api.kyc_routes import kyc_router
+from backend.src.api.admin_routes import admin_router
 
 setup_logging("DEBUG" if settings.ENVIRONMENT == "development" else "INFO")
 logger = get_logger("cortex.main")
@@ -50,6 +51,7 @@ app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 app.include_router(api_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(kyc_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 @app.get("/health")
 async def health_check():

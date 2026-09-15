@@ -61,6 +61,17 @@
 - [ ] **Export PDF des Relevés de Compte** :
   - En complément de l'export CSV existant, génération de relevés bancaires officiels au format PDF avec en-tête CortexPay et détail des écritures de Grand Livre.
 
+### 4. Panneau d'Administration Web (Cortex Admin Portal)
+- [ ] **Initialisation Frontend Web** : Application React 18 + Vite + TypeScript + TailwindCSS + Lucide Icons dans `frontend/`.
+- [ ] **Endpoints d'Administration Backend (`/api/admin/*`)** :
+  - `GET /api/admin/metrics` : KPI globaux (Trésorerie XOF/USD, volume traité, solde pivot FX, cartes actives, litiges ouverts).
+  - `GET /api/admin/ledger` : Consultation intégrale des écritures du Grand Livre avec filtres & statut de balance.
+  - `GET /api/admin/kyc/pending` & `POST /api/admin/kyc/{user_id}/review` : Revue et validation/refus des dossiers KYC avec visualisation des pièces d'identité.
+  - `GET /api/admin/cards` & `POST /api/admin/cards/{card_id}/freeze` : Supervision des cartes virtuelles et blocage d'urgence.
+  - `GET /api/admin/disputes` & `POST /api/admin/disputes/{dispute_id}/resolve` : Interface d'arbitrage des litiges Visa.
+  - `GET /api/admin/reconciliation` : Audit des rapprochements bancaires journaliers Wave/OM.
+- [ ] **Dockerisation & Déploiement** : Mise à jour du conteneur `cortex_frontend` (port 3000) dans `docker-compose.yml` avec Nginx multi-stage build.
+
 ---
 
 ## 🛠️ Journal des Décisions d'Ingénierie
