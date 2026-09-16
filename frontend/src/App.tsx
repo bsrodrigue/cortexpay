@@ -12,9 +12,14 @@ import {
   ChevronRight,
   CreditCard,
   Download,
+  Eye,
+  EyeOff,
   FileCheck2,
   FileSpreadsheet,
   Lock,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Scale,
   Search,
@@ -31,6 +36,7 @@ import {
 
 import {
   adminApi,
+  ADMIN_TOKEN_KEY,
   type AdminCard,
   type AdminDispute,
   type AdminMetrics,
@@ -227,8 +233,111 @@ function ExportButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+// ─── Login Screen ─────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [password, setPassword] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const { token } = await adminApi.login(password);
+      localStorage.setItem(ADMIN_TOKEN_KEY, token);
+      onLogin();
+    } catch {
+      setError('Mot de passe incorrect.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center gap-3 mb-8 justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black tracking-widest text-white shadow-lg shadow-blue-600/30 text-lg">
+            CP
+          </div>
+          <div>
+            <div className="font-bold text-white text-lg tracking-tight">CortexPay HQ</div>
+            <div className="text-xs text-slate-400">Portail Administrateur</div>
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-4 backdrop-blur"
+        >
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+              Mot de passe administrateur
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                autoFocus
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-10 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+              >
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-blue-600/20"
+          >
+            {loading ? 'Vérification…' : 'Se connecter'}
+          </button>
+        </form>
+
+        <p className="text-center text-[11px] text-slate-600 mt-4">
+          BCEAO Audited · Double-Entry Ledger · Append-Only
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => !!localStorage.getItem(ADMIN_TOKEN_KEY)
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
+  }
+
+  return <AdminPortal onLogout={() => { localStorage.removeItem(ADMIN_TOKEN_KEY); setIsAuthenticated(false); }} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} />;
+}
+
+function AdminPortal({ onLogout, sidebarCollapsed, setSidebarCollapsed }: {
+  onLogout: () => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (v: boolean) => void;
+}) {
   const [activeSection, setActiveSection] = useState<SectionKey>('overview');
 
   // Data
@@ -675,24 +784,26 @@ export default function App() {
   // ── Sidebar nav helper ──────────────────────────────────────────────────────
   const navItem = (
     key: SectionKey,
-    label: React.ReactNode,
+    label: string,
     icon: React.ReactNode,
     badge?: React.ReactNode
   ) => (
     <button
       onClick={() => setActiveSection(key)}
+      title={sidebarCollapsed ? label : undefined}
       className={cn(
-        'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition',
+        'w-full flex items-center rounded-xl text-sm font-medium transition',
+        sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'justify-between px-3.5 py-2.5',
         activeSection === key
           ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className={cn('flex items-center', sidebarCollapsed ? '' : 'gap-3')}>
         {icon}
-        {label}
+        {!sidebarCollapsed && label}
       </div>
-      {badge}
+      {!sidebarCollapsed && badge}
     </button>
   );
 
@@ -703,111 +814,114 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 antialiased overflow-hidden font-sans">
       {/* ── Sidebar ── */}
-      <aside className="w-72 bg-slate-900/90 border-r border-slate-800/80 flex flex-col justify-between p-4 backdrop-blur">
+      <aside className={cn(
+        'bg-slate-900/90 border-r border-slate-800/80 flex flex-col justify-between p-3 backdrop-blur transition-all duration-200',
+        sidebarCollapsed ? 'w-16' : 'w-72'
+      )}>
         <div>
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-3 py-4 mb-4 border-b border-slate-800/60">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-black tracking-widest text-white shadow-lg shadow-blue-600/30">
+          {/* Logo + collapse toggle */}
+          <div className={cn(
+            'flex items-center mb-4 pb-4 border-b border-slate-800/60',
+            sidebarCollapsed ? 'flex-col gap-2 px-0' : 'gap-3 px-1'
+          )}>
+            <div className="w-9 h-9 shrink-0 rounded-xl bg-blue-600 flex items-center justify-center font-black tracking-widest text-white shadow-lg shadow-blue-600/30 text-sm">
               CP
             </div>
-            <div>
-              <div className="font-bold tracking-tight text-white flex items-center gap-1.5 text-base">
-                CortexPay{' '}
-                <span className="text-[10px] bg-blue-500/20 text-blue-400 font-semibold px-1.5 py-0.5 rounded border border-blue-500/30">
-                  HQ ADMIN
-                </span>
+            {!sidebarCollapsed && (
+              <div className="flex-1 min-w-0">
+                <div className="font-bold tracking-tight text-white flex items-center gap-1.5 text-sm">
+                  CortexPay{' '}
+                  <span className="text-[10px] bg-blue-500/20 text-blue-400 font-semibold px-1.5 py-0.5 rounded border border-blue-500/30">
+                    ADMIN
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 truncate">Portail Régulateur</p>
               </div>
-              <p className="text-xs text-slate-400">Portail Régulateur &amp; Opérations</p>
-            </div>
+            )}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Agrandir' : 'Réduire'}
+              className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition"
+            >
+              {sidebarCollapsed
+                ? <PanelLeftOpen className="w-4 h-4" />
+                : <PanelLeftClose className="w-4 h-4" />}
+            </button>
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-1">
             {navItem('overview', "Vue d'ensemble", <Activity className="w-4 h-4" />)}
+            {navItem('users', 'Utilisateurs', <Users className="w-4 h-4" />, countBadge(usersTotal))}
+            {navItem('ledger', 'Grand Livre', <FileSpreadsheet className="w-4 h-4" />, countBadge(ledgerTotal))}
             {navItem(
-              'users',
-              'Utilisateurs',
-              <Users className="w-4 h-4" />,
-              countBadge(usersTotal)
-            )}
-            {navItem(
-              'ledger',
-              'Grand Livre',
-              <FileSpreadsheet className="w-4 h-4" />,
-              countBadge(ledger.length)
-            )}
-            {navItem(
-              'kyc',
-              'Conformité KYC',
-              <FileCheck2 className="w-4 h-4" />,
-              kycPending.length > 0 ? (
+              'kyc', 'Conformité KYC', <FileCheck2 className="w-4 h-4" />,
+              kycTotal > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 animate-pulse">
-                  {kycPending.length}
+                  {kycTotal}
                 </span>
               ) : undefined
             )}
+            {navItem('cards', 'Cartes Virtuelles', <CreditCard className="w-4 h-4" />, countBadge(cardsTotal))}
+            {navItem('transactions', 'Transactions', <ReceiptText className="w-4 h-4" />, countBadge(transactionsTotal))}
             {navItem(
-              'cards',
-              'Cartes Virtuelles',
-              <CreditCard className="w-4 h-4" />,
-              countBadge(cards.length)
-            )}
-            {navItem(
-              'transactions',
-              'Transactions',
-              <ReceiptText className="w-4 h-4" />,
-              countBadge(transactionsTotal)
-            )}
-            {navItem(
-              'disputes',
-              'Litiges',
-              <Scale className="w-4 h-4" />,
+              'disputes', 'Litiges', <Scale className="w-4 h-4" />,
               openDisputesCount > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold border border-rose-500/30">
                   {openDisputesCount}
                 </span>
-              ) : countBadge(disputes.length)
+              ) : countBadge(disputesTotal)
             )}
-            {navItem(
-              'reconciliation',
-              'Rapprochement',
-              <ArrowRightLeft className="w-4 h-4" />,
-              countBadge(reconciliations.length)
-            )}
-            {navItem(
-              'webhooks',
-              'Webhooks',
-              <Webhook className="w-4 h-4" />,
-              webhooksTotal > 0 ? countBadge(webhooksTotal) : undefined
-            )}
-            {navItem(
-              'system-accounts',
-              'Comptes Système',
-              <Building2 className="w-4 h-4" />,
-              systemAccounts.length > 0 ? countBadge(systemAccounts.length) : undefined
-            )}
+            {navItem('reconciliation', 'Rapprochement', <ArrowRightLeft className="w-4 h-4" />, countBadge(reconciliationsTotal))}
+            {navItem('webhooks', 'Webhooks', <Webhook className="w-4 h-4" />, webhooksTotal > 0 ? countBadge(webhooksTotal) : undefined)}
+            {navItem('system-accounts', 'Comptes Système', <Building2 className="w-4 h-4" />, systemAccounts.length > 0 ? countBadge(systemAccounts.length) : undefined)}
           </nav>
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800/80 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              Invariant Comptable
-            </span>
-            <span className="text-emerald-400 font-mono font-bold">100% BALANCED</span>
-          </div>
-          <div className="text-[11px] text-slate-500">
-            &Sigma; Débits = &Sigma; Crédits (Triggers PostgreSQL actifs)
-          </div>
+        <div className="space-y-2">
+          {!sidebarCollapsed && (
+            <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  Invariant Comptable
+                </span>
+                <span className="text-emerald-400 font-mono font-bold">BALANCED</span>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                &Sigma; Débits = &Sigma; Crédits
+              </div>
+              <button
+                onClick={() => void loadData()}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-1.5 text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 rounded-lg transition"
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+                Actualiser
+              </button>
+            </div>
+          )}
+          {sidebarCollapsed && (
+            <button
+              onClick={() => void loadData()}
+              disabled={loading}
+              title="Actualiser"
+              className="w-full flex items-center justify-center py-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition"
+            >
+              <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+            </button>
+          )}
           <button
-            onClick={() => void loadData()}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-1.5 text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 rounded-lg transition"
+            onClick={onLogout}
+            title="Se déconnecter"
+            className={cn(
+              'w-full flex items-center gap-2 py-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition font-medium',
+              sidebarCollapsed ? 'justify-center px-0' : 'px-3'
+            )}
           >
-            <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
-            Actualiser les données
+            <LogOut className="w-4 h-4 shrink-0" />
+            {!sidebarCollapsed && 'Se déconnecter'}
           </button>
         </div>
       </aside>

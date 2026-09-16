@@ -1,9 +1,30 @@
 import axios from 'axios';
 
+export const ADMIN_TOKEN_KEY = 'cortexpay_admin_token';
+
 export const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
 });
+
+// Attach admin token to every request if present
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+  if (token) config.headers['x-admin-token'] = token;
+  return config;
+});
+
+// On 401, clear the stale token so the login screen reappears
+api.interceptors.response.use(
+  r => r,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+      window.location.reload();
+    }
+    return Promise.reject(err);
+  }
+);
 
 export interface AdminMetrics {
   treasury: {
@@ -177,6 +198,8 @@ export interface SystemAccount {
 }
 
 export const adminApi = {
+  login: (password: string) =>
+    api.post<{ token: string; message: string }>('/admin/auth/login', { password }).then(r => r.data),
   getMetrics: () => api.get<AdminMetrics>('/admin/metrics').then(r => r.data),
   getLedger: (limit = 20, offset = 0, dateFrom?: string, dateTo?: string) => {
     const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });

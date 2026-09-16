@@ -1,7 +1,9 @@
+import hashlib
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 import asyncpg
 
@@ -12,6 +14,28 @@ from backend.src.core.state_machine import InvalidStateTransitionError
 
 admin_router = APIRouter(prefix="/admin", tags=["Admin & Back-Office"])
 
+# ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+def _admin_password() -> str:
+    return os.getenv("ADMIN_PASSWORD", "cortexpay-admin")
+
+def _make_token(password: str) -> str:
+    """Deterministic token: valid for the current UTC hour."""
+    hour_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+    return hashlib.sha256(f"{password}:{hour_bucket}".encode()).hexdigest()
+
+def verify_admin_token(x_admin_token: Optional[str] = Header(default=None)):
+    if not x_admin_token or x_admin_token != _make_token(_admin_password()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token admin invalide ou expiré. Veuillez vous reconnecter.",
+        )
+
+AdminAuth = Depends(verify_admin_token)
+
+class AdminLoginDTO(BaseModel):
+    password: str
+
 class ReviewKYCDTO(BaseModel):
     decision: str  # APPROVED or REJECTED
     tier: int = 1
@@ -21,8 +45,19 @@ class ResolveDisputeAdminDTO(BaseModel):
     decision: str  # WON or LOST
     resolution_notes: str
 
+# ─── Login (public) ───────────────────────────────────────────────────────────
+
+@admin_router.post("/auth/login")
+async def admin_login(payload: AdminLoginDTO):
+    if payload.password != _admin_password():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mot de passe administrateur incorrect.",
+        )
+    return {"token": _make_token(payload.password), "message": "Authentification réussie"}
+
 @admin_router.get("/metrics")
-async def get_admin_metrics(conn: asyncpg.Connection = Depends(get_db_connection)):
+async def get_admin_metrics(_auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)):
     """
     Returns global financial health KPIs:
     - Total XOF & USD treasury across users
@@ -112,7 +147,7 @@ async def get_admin_ledger(
     offset: int = 0,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     """
     Returns paginated double-entry journal entries with their corresponding postings,
@@ -200,7 +235,7 @@ async def get_admin_ledger(
 async def list_pending_kyc(
     limit: int = 20,
     offset: int = 0,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     """
     Returns paginated users with submitted KYC documents waiting for compliance review.
@@ -257,7 +292,7 @@ async def list_pending_kyc(
 async def review_user_kyc(
     user_id: str,
     payload: ReviewKYCDTO,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     decision = payload.decision.upper()
     if decision not in ("APPROVED", "REJECTED"):
@@ -315,7 +350,7 @@ async def list_all_cards(
     limit: int = 20,
     offset: int = 0,
     status: Optional[str] = None,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     """
     Returns paginated virtual cards for supervision and fraud monitoring.
@@ -381,7 +416,7 @@ async def list_all_cards(
 @admin_router.post("/cards/{card_id}/toggle-freeze")
 async def admin_toggle_freeze_card(
     card_id: str,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     async with conn.transaction():
         card = await conn.fetchrow("SELECT status FROM virtual_cards WHERE card_id = $1 FOR UPDATE;", card_id)
@@ -398,7 +433,7 @@ async def list_all_disputes(
     limit: int = 20,
     offset: int = 0,
     status: Optional[str] = None,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     """
     Returns paginated customer transaction disputes for regulatory compliance.
@@ -461,7 +496,7 @@ async def list_all_disputes(
 async def admin_resolve_dispute(
     dispute_id: str,
     payload: ResolveDisputeAdminDTO,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     try:
         async with conn.transaction():
@@ -481,7 +516,7 @@ async def admin_resolve_dispute(
 async def list_reconciliations(
     limit: int = 20,
     offset: int = 0,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     """
     Returns paginated EOD reconciliation audit reports with discrepancy breakdowns.
@@ -526,7 +561,7 @@ async def list_all_users(
     limit: int = 20,
     offset: int = 0,
     search: str = "",
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     search_param = f"%{search}%" if search else "%"
     total = await conn.fetchval(
@@ -575,7 +610,7 @@ async def list_all_users(
 @admin_router.get("/users/{user_id}")
 async def get_user_detail(
     user_id: str,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     user = await conn.fetchrow("SELECT * FROM users WHERE user_id = $1;", user_id)
     if not user:
@@ -656,7 +691,7 @@ async def list_all_transactions(
     offset: int = 0,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     where_parts: List[str] = []
     count_params: List[Any] = []
@@ -717,7 +752,7 @@ async def list_webhooks(
     offset: int = 0,
     status: Optional[str] = None,
     provider: Optional[str] = None,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     where_parts: List[str] = []
     params: List[Any] = []
@@ -763,7 +798,7 @@ async def list_webhooks(
     }
 
 @admin_router.get("/system-accounts")
-async def list_system_accounts(conn: asyncpg.Connection = Depends(get_db_connection)):
+async def list_system_accounts(_auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)):
     rows = await conn.fetch(
         """
         SELECT id, account_number, currency, type, balance, created_at
@@ -787,7 +822,7 @@ async def list_system_accounts(conn: asyncpg.Connection = Depends(get_db_connect
 @admin_router.post("/users/{user_id}/suspend")
 async def suspend_user(
     user_id: str,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     result = await conn.execute(
         "UPDATE users SET is_verified = FALSE WHERE user_id = $1;",
@@ -800,7 +835,7 @@ async def suspend_user(
 @admin_router.post("/users/{user_id}/activate")
 async def activate_user(
     user_id: str,
-    conn: asyncpg.Connection = Depends(get_db_connection)
+    _auth: None = AdminAuth, conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     result = await conn.execute(
         "UPDATE users SET is_verified = TRUE WHERE user_id = $1;",
