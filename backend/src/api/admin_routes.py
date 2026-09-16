@@ -1,5 +1,4 @@
 import hashlib
-import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -7,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 import asyncpg
 
+from backend.src.core.config import settings
 from backend.src.core.database import get_db_connection
 from backend.src.services.dispute_service import DisputeService
 from backend.src.services.cortex_orchestrator import CortexOrchestrator
@@ -17,7 +17,7 @@ admin_router = APIRouter(prefix="/admin", tags=["Admin & Back-Office"])
 # ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 def _admin_password() -> str:
-    return os.getenv("ADMIN_PASSWORD", "cortexpay-admin")
+    return settings.ADMIN_PASSWORD
 
 def _make_token(password: str) -> str:
     """Deterministic token: valid for the current UTC hour."""

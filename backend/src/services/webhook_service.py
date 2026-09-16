@@ -32,7 +32,7 @@ class WebhookService:
     def verify_signature(payload_bytes: bytes, signature_header: Optional[str], secret: Optional[str] = None) -> bool:
         if not signature_header:
             return False
-        key = (secret or settings.WEBHOOK_SECRET_KEY).encode("utf-8")
+        key = (secret or settings.WEBHOOK_SECRET_KEY.get_secret_value()).encode("utf-8")
         expected_sig = hmac.new(key, payload_bytes, hashlib.sha256).hexdigest()
         # Header may be in the format 't=...,v1=hash' or simply 'hash'
         clean_header = signature_header
@@ -46,7 +46,7 @@ class WebhookService:
 
     @staticmethod
     def compute_signature(payload_bytes: bytes, secret: Optional[str] = None) -> str:
-        key = (secret or settings.WEBHOOK_SECRET_KEY).encode("utf-8")
+        key = (secret or settings.WEBHOOK_SECRET_KEY.get_secret_value()).encode("utf-8")
         return hmac.new(key, payload_bytes, hashlib.sha256).hexdigest()
 
     @staticmethod

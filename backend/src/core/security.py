@@ -35,7 +35,7 @@ def create_jwt_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = 
         expire = now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({"exp": expire, "iat": now})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 def decode_jwt_token(token: str) -> Optional[Dict[str, Any]]:
@@ -43,7 +43,7 @@ def decode_jwt_token(token: str) -> Optional[Dict[str, Any]]:
     Decodes and validates a JWT token's signature and expiration.
     """
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM])
         return payload
     except (jwt.PyJWTError, Exception):
         return None
